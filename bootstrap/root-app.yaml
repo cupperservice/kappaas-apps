@@ -1,28 +1,25 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: cert-manager
+  name: root-app
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
-  sources:
-    - repoURL: https://github.com/cupperservice/kappaas-apps.git
-      path: charts/cert-manager
-      # plugin:
-      #   name: avp-helm
-      # targetRevision: main
+  source:
+    repoURL: https://github.com/cupperservice/kappaas-apps
+    targetRevision: "main"
+    path: applications/base
   destination:
     server: https://kubernetes.default.svc
-    namespace: cert-manager
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
+      - CreateNamespace=false
     retry:
       limit: 5
       backoff:
