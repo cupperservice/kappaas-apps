@@ -1,0 +1,103 @@
+external-secrets:
+  image:
+    repository: ghcr.io/external-secrets/external-secrets
+  installCRDs: true
+  replicaCount: 1
+  leaderElect: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  livenessProbe:
+    enabled: true
+    spec:
+      port: 8082
+      timeoutSeconds: 5
+      failureThreshold: 5
+      periodSeconds: 10
+      successThreshold: 1
+      initialDelaySeconds: 10
+      httpGet:
+        port: live
+        path: /healthz
+  readinessProbe:
+    enabled: true
+    spec:
+      timeoutSeconds: 5
+      failureThreshold: 3
+      periodSeconds: 10
+      successThreshold: 1
+      initialDelaySeconds: 10
+      httpGet:
+        port: live
+        path: /readyz
+  concurrent: 1
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+  log:
+    level: info
+    timeEncoding: rfc3339
+  # podAnnotations:
+  #   ad.datadoghq.com/external-secrets.checks: |
+  #     {
+  #       "openmetrics": {
+  #         "instances": [
+  #           {
+  #             "openmetrics_endpoint": "http://%%host%%:8080/metrics",
+  #             "namespace": "external_secrets",
+  #             "metrics": [".*"]
+  #           }
+  #         ]
+  #       }
+  #     }
+  webhook:
+    port: 10250
+    replicaCount: 1
+    failurePolicy: Fail
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+    livenessProbe:
+      enabled: true
+      port: 8081
+      timeoutSeconds: 5
+      failureThreshold: 5
+      periodSeconds: 10
+      successThreshold: 1
+      initialDelaySeconds: 10
+    readinessProbe:
+      enabled: true
+      port: 8081
+      timeoutSeconds: 5
+      failureThreshold: 3
+      periodSeconds: 5
+      successThreshold: 1
+      initialDelaySeconds: 20
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+    certManager:
+      enabled: true
+      addInjectorAnnotations: true
+      cert:
+        create: true
+        issuerRef:
+          name: external-secrets-selfsigned
+          kind: Issuer
+          group: cert-manager.io
+    log:
+      level: info
+      timeEncoding: rfc3339
+  certController:
+    create: false
+  processClusterExternalSecret: false
+  processClusterStore: false
+  processClusterPushSecret: false
+  processPushSecret: false
+  crds:
+    createClusterExternalSecret: false
+    createClusterSecretStore: false
+    createClusterPushSecret: false
+    createPushSecret: false
