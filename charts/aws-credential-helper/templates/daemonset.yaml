@@ -16,22 +16,22 @@ spec:
       serviceAccountName: aws-credential-helper
       initContainers:
         - name: download-helper
-          image: curlimages/curl:latest
+          image: alpine:3.20
           command:
             - sh
             - -c
             - |
-              curl -sSL https://rolesanywhere.amazonaws.com/releases/1.3.0/X86_64/Linux/aws_signing_helper \
-                -o /usr/local/bin/aws_signing_helper && \
-              chmod +x /usr/local/bin/aws_signing_helper
+              wget -qO /opt/bin/aws_signing_helper \
+                https://rolesanywhere.amazonaws.com/releases/1.3.0/X86_64/Linux/aws_signing_helper && \
+              chmod +x /opt/bin/aws_signing_helper
           volumeMounts:
             - name: bin
-              mountPath: /usr/local/bin
+              mountPath: /opt/bin
       containers:
         - name: credential-helper
           image: alpine:3.20
           command:
-            - /usr/local/bin/aws_signing_helper
+            - /opt/bin/aws_signing_helper
             - serve
             - --certificate
             - /certs/tls.crt
@@ -54,7 +54,7 @@ spec:
               mountPath: /certs
               readOnly: true
             - name: bin
-              mountPath: /usr/local/bin
+              mountPath: /opt/bin
           readinessProbe:
             httpGet:
               path: /latest/meta-data/
