@@ -1,0 +1,4 @@
+apiVersion: v2
+name: aws-credential-helper
+version: 1.0.0
+description: DaemonSet that provides IMDS-compatible AWS credential endpoint via IAM Roles Anywhere

@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: aws-credential-helper
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: aws-credential-helper
+  template:
+    metadata:
+      labels:
+        app: aws-credential-helper
+    spec:
+      hostNetwork: true
+      serviceAccountName: aws-credential-helper
+      initContainers:
+        - name: download-helper
+          image: curlimages/curl:latest
+          command:
+            - sh
+            - -c
+            - |
+              curl -sSL https://rolesanywhere.amazonaws.com/releases/1.3.0/X86_64/Linux/aws_signing_helper \
+                -o /usr/local/bin/aws_signing_helper && \
+              chmod +x /usr/local/bin/aws_signing_helper
+          volumeMounts:
+            - name: bin
+              mountPath: /usr/local/bin
+      containers:
+        - name: credential-helper
+          image: alpine:3.20
+          command:
+            - /usr/local/bin/aws_signing_helper
+            - serve
+            - --certificate
+            - /certs/tls.crt
+            - --private-key
+            - /certs/tls.key
+            - --trust-anchor-arn
+            - {{ .Values.aws.trustAnchorArn }}
+            - --profile-arn
+            - {{ .Values.aws.profileArn }}
+            - --role-arn
+            - {{ .Values.aws.roleArn }}
+            - --port
+            - "9911"
+          ports:
+            - containerPort: 9911
+              hostPort: 9911
+              protocol: TCP
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+            - name: bin
+              mountPath: /usr/local/bin
+          readinessProbe:
+            httpGet:
+              path: /latest/meta-data/
+              port: 9911
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: certs
+          secret:
+            secretName: aws-credential-helper-cert
+        - name: bin
+          emptyDir: {}
