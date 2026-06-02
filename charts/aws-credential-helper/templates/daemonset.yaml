@@ -44,22 +44,27 @@ spec:
             - --role-arn
             - {{ .Values.aws.roleArn }}
             - --port
-            - "9911"
-          ports:
-            - containerPort: 9911
-              hostPort: 9911
-              protocol: TCP
+            - "19911"
           volumeMounts:
             - name: certs
               mountPath: /certs
               readOnly: true
             - name: bin
               mountPath: /opt/bin
+        - name: forwarder
+          image: alpine/socat
+          command:
+            - socat
+            - TCP-LISTEN:9911,fork,reuseaddr
+            - TCP:127.0.0.1:19911
+          ports:
+            - containerPort: 9911
+              hostPort: 9911
+              protocol: TCP
           readinessProbe:
-            httpGet:
-              path: /latest/meta-data/
+            tcpSocket:
               port: 9911
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
       volumes:
         - name: certs
