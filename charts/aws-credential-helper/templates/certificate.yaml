@@ -14,6 +14,7 @@ spec:
     algorithm: RSA
     size: 2048
   usages:
+    - digital signature
     - client auth
   issuerRef:
     name: {{ .Values.certificate.issuerRef.name }}
