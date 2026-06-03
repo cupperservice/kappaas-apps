@@ -38,19 +38,6 @@ external-secrets:
   log:
     level: info
     timeEncoding: rfc3339
-  # podAnnotations:
-  #   ad.datadoghq.com/external-secrets.checks: |
-  #     {
-  #       "openmetrics": {
-  #         "instances": [
-  #           {
-  #             "openmetrics_endpoint": "http://%%host%%:8080/metrics",
-  #             "namespace": "external_secrets",
-  #             "metrics": [".*"]
-  #           }
-  #         ]
-  #       }
-  #     }
   webhook:
     port: 10250
     replicaCount: 1
@@ -101,3 +88,8 @@ external-secrets:
     createClusterSecretStore: false
     createClusterPushSecret: false
     createPushSecret: false
+  extraEnv:
+    - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
+      value: "http://localhost:9911"
+    - name: AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE
+      value: "IPv4"
