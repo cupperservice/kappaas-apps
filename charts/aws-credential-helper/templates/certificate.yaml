@@ -5,6 +5,8 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   commonName: {{ .Values.certificate.commonName }}
+  dnsNames:
+    - {{ .Values.certificate.commonName }}
   secretName: aws-credential-helper-cert
   duration: {{ .Values.certificate.duration }}
   renewBefore: {{ .Values.certificate.renewBefore }}
