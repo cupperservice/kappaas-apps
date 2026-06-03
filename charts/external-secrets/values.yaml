@@ -89,11 +89,7 @@ external-secrets:
     createClusterPushSecret: false
     createPushSecret: false
   extraEnv:
-    - name: HOST_IP
-      valueFrom:
-        fieldRef:
-          fieldPath: status.hostIP
     - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
-      value: "http://$(HOST_IP):9911"
+      value: "http://aws-credential-helper.aws-credential-helper.svc.cluster.local:9911"
     - name: AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE
       value: "IPv4"
