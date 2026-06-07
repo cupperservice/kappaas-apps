@@ -5,3 +5,4 @@ resources:
   - cert-manager.yaml
   - aws-credential-helper.yaml
   - external-secrets.yaml
+  - cloudflare-tunnel.yaml
