@@ -21,7 +21,7 @@ spec:
         - /status
     - group: ""
       kind: Secret
-      name: cloudflare-tunnel-token
+      name: cloudflare-tunnel-credentials
       jsonPointers:
         - /data
         - /metadata/annotations

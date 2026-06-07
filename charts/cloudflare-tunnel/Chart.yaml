@@ -1,4 +1,8 @@
 apiVersion: v2
 name: cloudflare-tunnel
 version: 1.0.0
-description: Cloudflare Tunnel for exposing on-premises Kubernetes services to the internet
+description: Cloudflare Tunnel wrapper chart using official cloudflare/cloudflare-tunnel
+dependencies:
+  - name: cloudflare-tunnel
+    version: "0.3.2"
+    repository: https://cloudflare.github.io/helm-charts
