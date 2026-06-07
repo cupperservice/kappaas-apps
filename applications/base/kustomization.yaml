@@ -6,3 +6,4 @@ resources:
   - aws-credential-helper.yaml
   - external-secrets.yaml
   - cloudflare-tunnel.yaml
+  - metrics-server.yaml
