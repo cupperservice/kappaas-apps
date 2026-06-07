@@ -1,5 +1,9 @@
 replicaCount: 2
 
+ingress:
+  - hostname: kakeibon.kappa-as.com
+    service: http://client.kakeibon.svc.cluster.local:3000
+
 image:
   repository: cloudflare/cloudflared
   tag: latest

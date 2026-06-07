@@ -15,13 +15,15 @@ spec:
     spec:
       containers:
         - name: cloudflared
-          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - tunnel
             - --no-autoupdate
             - --metrics
             - 0.0.0.0:2000
+            - --config
+            - /etc/cloudflared/config.yaml
             - run
             - --token
             - $(TUNNEL_TOKEN)
@@ -33,9 +35,17 @@ spec:
                   key: token
           resources:
             {{ toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/cloudflared
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /ready
               port: 2000
             initialDelaySeconds: 10
             periodSeconds: 10
+      volumes:
+        - name: config
+          configMap:
+            name: cloudflared-config
