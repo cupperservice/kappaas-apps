@@ -1,23 +1,12 @@
 apiVersion: external-secrets.io/v1
-kind: SecretStore
-metadata:
-  name: kakeibon-secret-store
-  namespace: kakeibon
-spec:
-  provider:
-    aws:
-      service: SecretsManager
-      region: ap-northeast-1
----
-apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: kakeibon-apps-secret
-  namespace: kakeibon
+  namespace: argocd
 spec:
   refreshPolicy: OnChange
   secretStoreRef:
-    name: kakeibon-secret-store
+    name: argocd-secret-store
     kind: SecretStore
   target:
     name: kakeibon-apps-secret
