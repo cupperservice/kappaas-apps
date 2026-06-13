@@ -12,6 +12,7 @@ spec:
   source:
     repoURL: https://github.com/cupperservice/kappaas-apps
     path: argocd-config/repositories
+    targetRevision: main
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
