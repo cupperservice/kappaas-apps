@@ -26,6 +26,7 @@ spec:
         - /data
         - /metadata/annotations
         - /metadata/labels
+        - /metadata/ownerReferences
   syncPolicy:
     automated:
       prune: true
