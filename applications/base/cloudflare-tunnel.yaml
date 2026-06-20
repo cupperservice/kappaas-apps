@@ -14,6 +14,23 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: cloudflare-tunnel
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jqPathExpressions:
+        - .spec.data[].remoteRef.conversionStrategy
+        - .spec.data[].remoteRef.decodingStrategy
+        - .spec.data[].remoteRef.metadataPolicy
+        - .spec.data[].remoteRef.nullBytePolicy
+        - .status
+    - group: ""
+      kind: Secret
+      name: cloudflare-tunnel-credentials
+      jsonPointers:
+        - /data
+        - /metadata/annotations
+        - /metadata/labels
+        - /metadata/ownerReferences
   syncPolicy:
     automated:
       prune: true
