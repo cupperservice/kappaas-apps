@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - argocd-repositories.yaml
+  - argocd-applications.yaml
   - cert-manager.yaml
   - aws-credential-helper.yaml
   - external-secrets.yaml

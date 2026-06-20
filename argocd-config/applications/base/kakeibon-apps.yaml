@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-kakeibon
+  namespace: kakeibon
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: kakeibon
+  project: default
+  sources:
+    - path: components
+      repoURL: https://github.com/cupperservice/kakeibon-apps.git
+      targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+  
