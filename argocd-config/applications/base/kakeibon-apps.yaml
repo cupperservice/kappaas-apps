@@ -13,7 +13,7 @@ spec:
   sources:
     - path: components
       repoURL: https://github.com/cupperservice/kakeibon-apps.git
-      targetRevision: deploy-with-argocd
+      targetRevision: main
   syncPolicy:
     automated:
       prune: true
