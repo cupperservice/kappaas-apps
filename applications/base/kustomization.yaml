@@ -9,3 +9,4 @@ resources:
   - external-secrets.yaml
   - cloudflare-tunnel.yaml
   - metrics-server.yaml
+  - csi-driver-smb.yaml
