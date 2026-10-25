@@ -8,3 +8,10 @@ cloudflare-tunnel:
       - hostname: kakeibon.kappa-as.com
         service: http://client.kakeibon.svc.cluster.local:3000
   replicaCount: 2
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: cloudflare-tunnel
