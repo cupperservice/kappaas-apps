@@ -5,6 +5,7 @@ version: 2
 updates:
   - package-ecosystem: helm
     directories:
+      - /charts/argocd
       - /charts/cert-manager
       - /charts/cloudflare-tunnel
       - /charts/csi-driver-smb

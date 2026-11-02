@@ -1,0 +1,23 @@
+argo-cd:
+  configs:
+    cm:
+      url: https://argocd.local
+      admin.enabled: "false"
+      dex.config: |
+        connectors:
+          - type: github
+            id: github
+            name: GitHub
+            config:
+              clientID: Ov23li3cq07Nri2Q1XoI
+              clientSecret: $dex.github.clientSecret
+              redirectURI: https://argocd.local/api/dex/callback
+    rbac:
+      policy.default: role:readonly
+      scopes: '[groups, email]'
+      policy.csv: |
+        g, cupper@mac.com, role:admin
+    # argocd-secret（dex.github.clientSecret・server.secretkey）はチャートで作らず、
+    # bootstrap/argocd-dex-secret.yaml で投入した既存の Secret を使う（秘密情報を Git に入れない）
+    secret:
+      createSecret: false
