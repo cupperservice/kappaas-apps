@@ -52,7 +52,7 @@ spec:
             - name: bin
               mountPath: /opt/bin
         - name: forwarder
-          image: alpine/socat
+          image: alpine/socat:1.8.1.3
           command:
             - socat
             - TCP-LISTEN:9911,fork,reuseaddr

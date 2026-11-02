@@ -1,0 +1,36 @@
+# Dependabot: Helm チャートの依存とコンテナイメージの更新 PR を作る
+# main は Argo CD が自動同期するので、PR はマージした時点で本番に反映される。
+# マージ前に必ずリリースノート（特にメジャーバージョン）を確認すること。
+version: 2
+updates:
+  - package-ecosystem: helm
+    directories:
+      - /charts/cert-manager
+      - /charts/cloudflare-tunnel
+      - /charts/csi-driver-smb
+      - /charts/external-secrets
+      - /charts/metrics-server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps
+
+  - package-ecosystem: docker
+    directories:
+      - /charts/aws-credential-helper
+    schedule:
+      interval: weekly
+      day: monday
+      time: "09:00"
+      timezone: Asia/Tokyo
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: deps
