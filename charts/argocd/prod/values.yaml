@@ -1,0 +1,14 @@
+# 本番クラスタ用（values.yaml に重ねる）
+argo-cd:
+  configs:
+    cm:
+      url: https://argocd.local
+      dex.config: |
+        connectors:
+          - type: github
+            id: github
+            name: GitHub
+            config:
+              clientID: Ov23li3cq07Nri2Q1XoI
+              clientSecret: $dex.github.clientSecret
+              redirectURI: https://argocd.local/api/dex/callback

@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/cupperservice/kappaas-apps
-    targetRevision: "main"
+    targetRevision: "release"
     path: applications/overlays/prod
   destination:
     server: https://kubernetes.default.svc

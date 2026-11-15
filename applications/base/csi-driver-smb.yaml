@@ -11,6 +11,9 @@ spec:
     repoURL: https://github.com/cupperservice/kappaas-apps.git
     path: charts/csi-driver-smb
     targetRevision: main
+    helm:
+      valueFiles:
+        - values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: kube-system

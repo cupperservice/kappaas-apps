@@ -1,3 +1,4 @@
+# prod / dev 共通の値。環境ごとの値は prod/values.yaml・dev/values.yaml
 csi-driver-smb:
   linux:
     enabled: true

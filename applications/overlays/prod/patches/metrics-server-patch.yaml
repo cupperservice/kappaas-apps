@@ -1,0 +1,13 @@
+# release ブランチを同期し、chart の共通 values.yaml に prod/values.yaml を重ねる
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: metrics-server
+  namespace: argocd
+spec:
+  source:
+    targetRevision: release
+    helm:
+      valueFiles:
+        - values.yaml
+        - prod/values.yaml

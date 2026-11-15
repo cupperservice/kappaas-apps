@@ -16,10 +16,12 @@ spec:
     helm:
       # helm install 時のリリース名。リソース名（argocd-server など）を変えないため
       releaseName: argocd
+      valueFiles:
+        - values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
-  # Argo CD 自身なので自動同期にしない（Diff を確認してから手動で Sync。手順は argocd-self-managed.md）
+  # Argo CD 自身なので自動同期にしない（Diff を確認してから手動で Sync。手順は docs/argocd-self-managed.md）
   # finalizer も付けない（Application を消しても Argo CD 本体は残す）
   syncPolicy:
     syncOptions:

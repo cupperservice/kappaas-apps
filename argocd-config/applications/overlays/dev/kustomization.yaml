@@ -1,0 +1,10 @@
+# 開発クラスタ（altair）用。業務アプリも dev ブランチを同期する
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# patches/<base のファイル名>-patch.yaml
+patches:
+  - path: patches/kakeibon-apps-patch.yaml
