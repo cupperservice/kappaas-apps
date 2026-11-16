@@ -1,5 +1,36 @@
 # IAM Roles Anywhere のロール分割とサイドカー化（external-secrets / kakeibon-backend）
 
+## 環境分割後の実施方針（2026-11-16 追記）
+
+この文書は本番 / 開発に分ける前（2026-11-14）に書いた。今は次の方針で進める。下の設計・ポリシーの考え方はそのまま有効。
+
+| 項目 | 方針 |
+|---|---|
+| IAM の作り方 | CloudFormation（[aws/rolesanywhere.yaml](../aws/rolesanywhere.yaml)）で環境ごとにスタックを作る（`kappaas-dev-rolesanywhere` / `kappaas-prod-rolesanywhere`）。本番も新しいトラストアンカー・プロファイルを作る（下の「AWS 側の手順」の CLI は使わない） |
+| ロール名 | external-secrets: 本番 `KappaasExternalSecretsRole`、開発 `KappaasDevExternalSecretsRole`（kakeibon-backend 用は段階 2 でテンプレートに追加） |
+| サイドカーの ARN | 環境ごとに違うので `charts/external-secrets/{prod,dev}/values.yaml` の `aws.*` に書き、ConfigMap `external-secrets-aws` 経由でサイドカーに渡す（サイドカーの定義は共通の `values.yaml` に 1 つ） |
+| 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（kakeibon-apps。後日） |
+| 共用の aws-credential-helper | 開発: 段階 1 で廃止（`applications/overlays/dev/patches/aws-credential-helper-patch.yaml` で除外）。本番: kakeibon-backend が使うので段階 2 まで残す（KppaasRole のまま） |
+| 開発の kakeibon-backend | AWS の権限は付けない（開発用のテーブル・バケットを用意してから段階 2 で検討） |
+
+### 段階 1 の手順（external-secrets）
+
+1. **[AWS]** 開発スタックを更新（Outputs の ExternalSecretsRoleArn が `KappaasDevExternalSecretsRole`）。手順は [dev-cluster.md](dev-cluster.md) の 7
+2. dev ブランチに push → 開発クラスタで下の「2. external-secrets にサイドカーを追加」の確認（`--context dev`）
+3. **[AWS]** 本番スタックを作成（`Environment=prod`、本番の CA）→ Outputs の ARN を `charts/external-secrets/prod/values.yaml` に書く
+   ```bash
+   kubectl --context prod get secret k8s-ca-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/k8s-backup/prod-ca.crt
+   aws cloudformation deploy --region ap-northeast-1 --stack-name kappaas-prod-rolesanywhere \
+     --template-file aws/rolesanywhere.yaml --capabilities CAPABILITY_NAMED_IAM \
+     --parameter-overrides Environment=prod CaCertificate="$(cat ~/k8s-backup/prod-ca.crt)"
+   ```
+4. dev → main → release → 本番で同じ確認（`--context prod`）。本番の旧 helper（DaemonSet）は残るので、問題があれば revert で戻せる
+
+- [ ] 開発スタック更新
+- [ ] 開発で確認
+- [ ] 本番スタック作成・prod/values.yaml に ARN
+- [ ] 本番で確認
+
 ## 現状（2026-11-14）
 
 ```
@@ -247,6 +278,9 @@ aws rolesanywhere update-profile --profile-id 591bccad-ba10-4397-b798-5de2d5795f
 
 ### external-secrets: charts/external-secrets（このリポジトリ）
 
+> **実装済み（段階 1）**: 実際のファイルは `charts/external-secrets/templates/aws-certificate.yaml`・`templates/aws-config.yaml`・`values.yaml`・`{prod,dev}/values.yaml`。
+> 下の例との違い: ARN を直接書かず ConfigMap `external-secrets-aws` から環境変数で渡す（`envFrom` と `sh -c 'exec aws_signing_helper serve ... "$ROLE_ARN"'`）。
+
 **Certificate（新規）** `charts/external-secrets/templates/aws-certificate.yaml`
 
 ```yaml
@@ -315,8 +349,8 @@ external-secrets:
         - --port
         - "9911"
       startupProbe:                            # 通るまで ESO 本体を起動しない
-        tcpSocket:
-          port: 9911
+        exec:                                  # helper は 127.0.0.1 だけで待ち受けるので tcpSocket（Pod IP に接続）は使えない
+          command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
         periodSeconds: 2
         failureThreshold: 30
       resources:
@@ -407,8 +441,8 @@ spec:
             - --port
             - "9911"
           startupProbe:                        # 通るまで backend を起動しない
-            tcpSocket:
-              port: 9911
+            exec:                              # helper は 127.0.0.1 だけで待ち受けるので tcpSocket（Pod IP に接続）は使えない
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
             periodSeconds: 2
             failureThreshold: 30
           resources:

@@ -62,14 +62,14 @@ feature ブランチ → dev（開発で確認）→ main（本番が同期）
   ├── Chart.yaml
   ├── values.yaml        prod / dev 共通の値
   ├── prod/values.yaml   本番の値
-  └── dev/values.yaml    開発の値（cloudflare-tunnel は開発に入れないので無し）
+  └── dev/values.yaml    開発の値（cloudflare-tunnel・aws-credential-helper は開発に入れないので無し）
   ```
 
   - patch は base のファイルごとに 1 つ、`overlays/<env>/patches/<base のファイル名>-patch.yaml` に置く
   - patch は strategic merge 形式（Application のマニフェストの一部を書く）。`metadata.name` で対象が決まるので kustomization.yaml に target は書かない
   - リスト（`valueFiles`、`sources`）は丸ごと置き換わるので、patch には全要素を書く（例: `valueFiles: [values.yaml, dev/values.yaml]`）
   - Application は base で `values.yaml` を指定し、patch で `prod/values.yaml` / `dev/values.yaml` を後ろに追加する（後ろが優先）
-  - 現在、環境で値が違うのは argocd（URL・dex）、aws-credential-helper（IAM Roles Anywhere の ARN）、cloudflare-tunnel（本番のみ）
+  - 現在、環境で値が違うのは argocd（URL・dex）、external-secrets（サイドカーが使う IAM Roles Anywhere の ARN）、aws-credential-helper（本番のみ。kakeibon-backend 用）、cloudflare-tunnel（本番のみ）
   - base に Application を追加したら、prod・dev の両方に patch を作って kustomization.yaml に追加する
   - 開発用の bootstrap は `bootstrap/*-dev.yaml`
 - **Argo CD 自身（`argocd` アプリ）は手動 Sync**（[argocd-self-managed.md](argocd-self-managed.md)）。本番より先に開発で Sync して確認する
@@ -240,10 +240,14 @@ kubectl --context dev apply -f bootstrap/argocd-dex-secret-dev.yaml      # argoc
 cd charts/argocd && helm dependency build \
   && helm --kube-context dev install argocd . -n argocd -f values.yaml -f dev/values.yaml \
   && rm -rf charts Chart.lock && cd -
-kubectl --context dev apply -f bootstrap/argocd-repo-secret.yaml         # リポジトリの認証情報
 kubectl --context dev apply -f bootstrap/argo-server-dev.yaml            # HTTPProxy argocd-dev.local
 kubectl --context dev apply -f bootstrap/root-app-dev.yaml
+# external-secrets が入って CRD ができてから（kubectl --context dev get crd secretstores.external-secrets.io）
+kubectl --context dev apply -f bootstrap/argocd-secrets.yaml             # SecretStore argocd-secret-store
 ```
+
+- リポジトリの認証情報（kappaas-apps・kakeibon-apps）は `argocd-config/repositories` の ExternalSecret が Secrets Manager から作る。手で apply しない
+  （kappaas-apps は public なので、認証情報が無くても root-app は同期できる）
 
 - root-app-dev が `applications/overlays/dev` を同期し、cert-manager・external-secrets などが入る（cloudflare-tunnel は入らない）
 - この時点では aws-credential-helper の ARN が未設定（`REPLACE_WITH_...`）なので、aws-credential-helper と external-secrets の SecretStore はエラーになる。次の 7 で直す
@@ -252,6 +256,9 @@ kubectl --context dev apply -f bootstrap/root-app-dev.yaml
 ### 7. AWS: dev 用 IAM Roles Anywhere
 
 altair の cert-manager は本番と別の CA を作るので、本番のトラストアンカーでは認証できない。dev 用に作る。
+
+開発では共用の aws-credential-helper（DaemonSet）は使わない。external-secrets のコントローラーの Pod 内のサイドカーが、
+CN=`external-secrets` の証明書で `KappaasDevExternalSecretsRole` を引き受ける（[iam-roles-anywhere.md](iam-roles-anywhere.md)）。
 
 1. **[Mac]** dev の CA 証明書を取り出す
 
@@ -262,21 +269,51 @@ altair の cert-manager は本番と別の CA を作るので、本番のトラ�
    openssl x509 -in ~/k8s-backup/dev-ca.crt -noout -subject -enddate
    ```
 
-2. **[AWS]**（ap-northeast-1）
-   - IAM Roles Anywhere のトラストアンカーを作成（ソース: 外部証明書バンドル = dev-ca.crt）
-   - ロール `KappaasDevRole` を作成
-     - 信頼ポリシー: `rolesanywhere.amazonaws.com`、条件に dev のトラストアンカー ARN（`aws:SourceArn`）と証明書の CN（`aws:PrincipalTag/x509Subject/CN` = `k8s-workload`）
-     - 権限: 開発で使う Secrets Manager のキーの読み取りのみ（`kappaas-apps/repositories/*` など）。本番の DynamoDB / S3 / SES は付けない
-   - プロファイルを作成（ロール: KappaasDevRole）
-3. ARN を `charts/aws-credential-helper/dev/values.yaml` に書いて dev ブランチに push
+2. **[Mac]** CloudFormation でトラストアンカー・ロール・プロファイルを作る（テンプレート: [aws/rolesanywhere.yaml](../aws/rolesanywhere.yaml)。`Environment=dev`）
+
+   | リソース | 名前（dev） | 内容 |
+   |---|---|---|
+   | トラストアンカー | `kappaas-dev` | dev の CA 証明書（dev-ca.crt） |
+   | ロール | `KappaasDevExternalSecretsRole` | 信頼ポリシー: dev のトラストアンカー（`aws:SourceArn`）かつ CN=`external-secrets`。権限: Secrets Manager の読み取り（dev の既定は `kappaas-apps/repositories/*` のみ） |
+   | プロファイル | `kappaas-dev` | KappaasDevExternalSecretsRole |
+
+   ```bash
+   # リポジトリのルートで。IAM ロールを作れる権限の AWS プロファイルで実行
+   aws cloudformation validate-template --template-body file://aws/rolesanywhere.yaml
+   aws cloudformation deploy --region ap-northeast-1 \
+     --stack-name kappaas-dev-rolesanywhere \
+     --template-file aws/rolesanywhere.yaml \
+     --capabilities CAPABILITY_NAMED_IAM \
+     --parameter-overrides Environment=dev CaCertificate="$(cat ~/k8s-backup/dev-ca.crt)"
+
+   aws cloudformation describe-stacks --region ap-northeast-1 --stack-name kappaas-dev-rolesanywhere \
+     --query 'Stacks[0].Outputs' --output table      # TrustAnchorArn / ProfileArn / ExternalSecretsRoleArn
+   ```
+
+   - 名前と既定の権限は、テンプレートの `Mappings`（`EnvironmentMap`）で環境ごとに決まる。スタックは環境ごとに分ける（`kappaas-<env>-rolesanywhere`）
+   - 開発クラスタを作り直して CA が変わったら、新しい dev-ca.crt で同じ deploy を再実行する（トラストアンカーの証明書が置き換わる）
+   - 読み取りを許可するシークレットを変えるときは、`SecretArnPatterns` を指定して再実行する（カンマ区切り。指定すると既定は使われないので、必要なものをすべて書く）
+
+     ```bash
+     ... --parameter-overrides Environment=dev CaCertificate="$(cat ~/k8s-backup/dev-ca.crt)" \
+       SecretArnPatterns="arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kappaas-apps/repositories/*,arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:<追加するシークレット>/*"
+     ```
+
+   - 本番（`Environment=prod`）も同じテンプレートで作る（[iam-roles-anywhere.md](iam-roles-anywhere.md)「段階 1 の手順」）
+3. Outputs の 3 つの ARN を `charts/external-secrets/dev/values.yaml` の `aws.trustAnchorArn` / `profileArn` / `roleArn` に書いて dev ブランチに push
 4. **[Mac]** 確認
 
    ```bash
-   kubectl --context dev -n aws-credential-helper get pods                  # Running
+   kubectl --context dev -n external-secrets get certificate external-secrets-aws        # READY True
+   kubectl --context dev -n external-secrets get pods -l app.kubernetes.io/name=external-secrets   # READY 2/2
+   # サイドカーが引き受けたロール名（KappaasDevExternalSecretsRole）
+   kubectl --context dev -n external-secrets exec deploy/external-secrets -c aws-credential-helper -- sh -c '
+     T=$(curl -s -X PUT http://127.0.0.1:9911/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+     curl -s -H "X-aws-ec2-metadata-token: $T" http://127.0.0.1:9911/latest/meta-data/iam/security-credentials/; echo'
    kubectl --context dev -n argocd get secretstore,externalsecret           # Ready / SecretSynced
    ```
 
-- [iam-roles-anywhere.md](iam-roles-anywhere.md) のサイドカー化を進めた場合は、dev も同じ構成にする（ロールを external-secrets 用・kakeibon-backend 用に分け、各 chart の dev/values.yaml に置く）
+- 開発の kakeibon-backend には AWS の権限を付けていない（DynamoDB / S3 / SES は使えない）。開発用のテーブル・バケットを用意してから検討する
 
 ### 8. 業務アプリ（kakeibon）
 
@@ -285,7 +322,7 @@ altair の cert-manager は本番と別の CA を作るので、本番のトラ�
 - [ ] kakeibon-apps 側で開発用の差分を用意する（このリポジトリの範囲外）
   - DynamoDB テーブル・S3 バケットを本番と分けるか
   - 外部公開しないので、アクセスは LAN 内（Contour の HTTPProxy で `kakeibon-dev.local` など）
-  - kakeibon-backend の AWS 資格情報（KappaasDevRole に必要な権限を足す）
+  - kakeibon-backend の AWS 資格情報（iam-roles-anywhere.md の段階 2。開発用の KakeibonBackend ロールをテンプレートに追加する）
 
 ---
 

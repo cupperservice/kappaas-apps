@@ -83,8 +83,46 @@ Argo CD が復旧したら、release（と main・dev）も前のバージョン
 kubectl create namespace argocd
 kubectl apply -f bootstrap/argocd-dex-secret.yaml       # argocd-secret（dex の clientSecret）
 cd charts/argocd && helm dependency build && helm install argocd . -n argocd -f values.yaml -f prod/values.yaml && rm -rf charts Chart.lock && cd -
-kubectl apply -f bootstrap/argocd-repo-secret.yaml      # リポジトリの認証情報
 kubectl --context prod apply -f bootstrap/root-app-prod.yaml
+# external-secrets が入って CRD ができてから（kubectl get crd secretstores.external-secrets.io）
+kubectl --context prod apply -f bootstrap/argocd-secrets.yaml   # SecretStore argocd-secret-store（リポジトリの認証情報を Secrets Manager から取る）
 ```
 
 以後は root-app 経由で `argocd` アプリが作られ、自己管理に入る。
+
+- リポジトリの認証情報（kappaas-apps・kakeibon-apps）は `argocd-config/repositories` の ExternalSecret が作る。手で apply しない
+- kappaas-apps は public なので、認証情報ができる前でも root-app は同期できる（kakeibon-apps は private なので、SecretStore を入れるまで同期できない）
+
+---
+
+## リポジトリの認証情報を ESO 管理に移す（1 回だけ・未実施）
+
+以前は `bootstrap/argocd-repo-secret.yaml`（Secret `kappaas-apps-repo`）を kubectl apply していた。
+これを ExternalSecret `kappaas-apps-secret`（`argocd-config/repositories/base/kappaas-apps.yaml`）に置き換える。
+
+1. **[Mac]** PAT を Secrets Manager に登録する（値は今のクラスタの Secret から取る。画面に出さない）
+
+   ```bash
+   aws secretsmanager create-secret --region ap-northeast-1 \
+     --name kappaas-apps/repositories/kappaas-apps/github-personal-access-token \
+     --secret-string "$(kubectl --context prod -n argocd get secret kappaas-apps-repo -o jsonpath='{.data.password}' | base64 -d)"
+   ```
+
+   - 読み取り権限: 本番（KppaasRole、サイドカー化後は KappaasExternalSecretsRole）は `kappaas-apps/*`、開発の KappaasDevExternalSecretsRole は `kappaas-apps/repositories/*`（aws/rolesanywhere.yaml の既定）なので追加は不要
+2. dev → main → release とマージし、各クラスタで `argocd-repositories` が同期されたら確認
+
+   ```bash
+   kubectl --context prod -n argocd get externalsecret kappaas-apps-secret     # SecretSynced / True
+   kubectl --context prod -n argocd get secret kappaas-apps-secret -o jsonpath='{.metadata.labels}{"\n"}'   # secret-type: repository
+   ```
+
+3. **[Mac]** 古い Secret を削除し、Argo CD の Settings → Repositories で kappaas-apps が Successful のままであることを確認
+
+   ```bash
+   kubectl --context prod -n argocd delete secret kappaas-apps-repo
+   kubectl --context dev -n argocd delete secret kappaas-apps-repo --ignore-not-found
+   ```
+
+4. Mac の `bootstrap/argocd-repo-secret.yaml`（gitignore 済み）を削除する（PAT が平文で残っているため）
+
+- [ ] 移行
