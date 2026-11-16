@@ -103,8 +103,68 @@ external-secrets:
     createClusterSecretStore: false
     createClusterPushSecret: false
     createPushSecret: false
+  # AWS の資格情報は Pod 内のサイドカー（aws_signing_helper serve、127.0.0.1:9911）から取る
+  # 設計と経緯は docs/iam-roles-anywhere.md
   extraEnv:
     - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
-      value: "http://aws-credential-helper.aws-credential-helper.svc.cluster.local:9911"
+      value: "http://127.0.0.1:9911"
     - name: AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE
       value: "IPv4"
+  # extraInitContainers / extraVolumes はコントローラーの Deployment にだけ入る（webhook・certController には入らない）
+  extraInitContainers:
+    # aws_signing_helper を取得する
+    - name: download-helper
+      image: alpine:3.20
+      command:
+        - sh
+        - -c
+        - |
+          wget -qO /opt/bin/aws_signing_helper \
+            https://rolesanywhere.amazonaws.com/releases/1.8.2/X86_64/Linux/Amzn2023/aws_signing_helper && \
+          chmod +x /opt/bin/aws_signing_helper
+      volumeMounts:
+        - name: bin
+          mountPath: /opt/bin
+    # ネイティブサイドカー（restartPolicy: Always）。startupProbe が通るまで ESO 本体は起動しない
+    - name: aws-credential-helper
+      image: amazonlinux:2023
+      restartPolicy: Always
+      # ARN は環境ごとに違うので ConfigMap（templates/aws-config.yaml）から環境変数で受け取る
+      envFrom:
+        - configMapRef:
+            name: external-secrets-aws
+      command:
+        - sh
+        - -c
+        - |
+          exec /opt/bin/aws_signing_helper serve \
+            --certificate /certs/tls.crt \
+            --private-key /certs/tls.key \
+            --trust-anchor-arn "$TRUST_ANCHOR_ARN" \
+            --profile-arn "$PROFILE_ARN" \
+            --role-arn "$ROLE_ARN" \
+            --port 9911
+      # helper は 127.0.0.1 だけで待ち受けるので、Pod IP に接続する tcpSocket probe は使えない。Pod 内から確認する
+      startupProbe:
+        exec:
+          command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
+        periodSeconds: 2
+        failureThreshold: 30
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 64Mi
+      volumeMounts:
+        - name: certs
+          mountPath: /certs
+          readOnly: true
+        - name: bin
+          mountPath: /opt/bin
+  extraVolumes:
+    - name: certs
+      secret:
+        secretName: external-secrets-aws-cert
+    - name: bin
+      emptyDir: {}

@@ -1,0 +1,32 @@
+# このリポジトリ（kappaas-apps）の認証情報
+# 以前は bootstrap/argocd-repo-secret.yaml（kappaas-apps-repo）を kubectl apply していた
+# kappaas-apps は public なので、この Secret が無くても Argo CD は読める（クラスタ構築直後も ESO より前に同期できる）
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: kappaas-apps-secret
+  namespace: argocd
+spec:
+  refreshPolicy: OnChange
+  secretStoreRef:
+    name: argocd-secret-store
+    kind: SecretStore
+  target:
+    name: kappaas-apps-secret
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      metadata:
+        labels:
+          argocd.argoproj.io/secret-type: repository
+      type: Opaque
+      data:
+        type: git
+        url: "https://github.com/cupperservice/kappaas-apps"
+        name: "kappaas-apps"
+        username: "cupperservice"
+        password: "{{ .githubpat }}"
+  data:
+    - secretKey: githubpat
+      remoteRef:
+        key: kappaas-apps/repositories/kappaas-apps/github-personal-access-token

@@ -1,6 +1,0 @@
-# 開発クラスタ（altair）用（values.yaml に重ねる）
-# altair の cert-manager は本番と別の CA を作るので、dev 用のトラストアンカー・プロファイル・ロールを使う（docs/dev-cluster.md 7）
-aws:
-  trustAnchorArn: "REPLACE_WITH_DEV_TRUST_ANCHOR_ARN"
-  profileArn: "REPLACE_WITH_DEV_PROFILE_ARN"
-  roleArn: "REPLACE_WITH_DEV_ROLE_ARN"

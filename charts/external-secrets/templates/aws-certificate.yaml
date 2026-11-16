@@ -1,0 +1,23 @@
+# ESO コントローラーのサイドカー（aws_signing_helper）が IAM Roles Anywhere で使うクライアント証明書
+# CN は aws/rolesanywhere.yaml の ExternalSecretsRole の信頼ポリシー（x509Subject/CN）と合わせる
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: external-secrets-aws
+  namespace: {{ .Release.Namespace }}
+spec:
+  commonName: external-secrets
+  dnsNames:
+    - external-secrets
+  secretName: external-secrets-aws-cert
+  duration: 720h
+  renewBefore: 72h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - client auth
+  issuerRef:
+    name: k8s-ca
+    kind: ClusterIssuer
