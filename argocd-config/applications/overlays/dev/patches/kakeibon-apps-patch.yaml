@@ -1,12 +1,10 @@
-# 業務アプリも dev ブランチを同期する
-# sources はリストなので丸ごと置き換わる（repoURL・path も書く）
+# 開発は dev ブランチの services/kakeibon/overlays/dev を同期する
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: app-kakeibon
   namespace: argocd
 spec:
-  sources:
-    - path: components
-      repoURL: https://github.com/cupperservice/kakeibon-apps.git
-      targetRevision: dev
+  source:
+    path: services/kakeibon/overlays/dev
+    targetRevision: dev
