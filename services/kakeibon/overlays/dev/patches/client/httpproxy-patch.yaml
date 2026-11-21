@@ -1,0 +1,9 @@
+# LAN 内のホスト名（Mac の /etc/hosts に MetalLB の IP で登録する）
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: kakeibon-client
+  namespace: kakeibon
+spec:
+  virtualhost:
+    fqdn: kakeibon-dev.local

@@ -1,3 +1,5 @@
+# 業務アプリ kakeibon（マニフェストは services/kakeibon。以前は kakeibon-apps リポジトリの components）
+# path・targetRevision は overlays/<env>/patches/kakeibon-apps-patch.yaml で環境ごとに決める
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -10,12 +12,14 @@ spec:
     server: https://kubernetes.default.svc
     namespace: kakeibon
   project: default
-  sources:
-    - path: components
-      repoURL: https://github.com/cupperservice/kakeibon-apps.git
-      targetRevision: main
+  source:
+    repoURL: https://github.com/cupperservice/kappaas-apps.git
+    path: services/kakeibon/overlays/prod
+    targetRevision: main
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-  
+    syncOptions:
+      # 開発クラスタには kakeibon の Namespace が無いため（本番は既にある）
+      - CreateNamespace=true

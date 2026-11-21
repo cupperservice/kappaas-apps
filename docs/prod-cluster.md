@@ -18,7 +18,7 @@
 | altair  | 192.168.3.125 | **開発クラスタ**（別クラスタ。[dev-cluster.md](dev-cluster.md)） |
 
 - etcd は 3 メンバー。1 台の故障に耐える（2 台止まるとクラスタ全体が停止）
-- MetalLB: 192.168.3.120、Argo CD: https://argocd.local（kappaas-apps は `release`、kakeibon-apps は `main` を同期）
+- MetalLB: 192.168.3.120、Argo CD: https://argocd.local（kappaas-apps は `release` を同期。業務アプリ kakeibon は release への切り替えまで kakeibon-apps の `main`、切り替え後は `services/kakeibon/overlays/prod`）
 - Mac の kubeconfig のコンテキスト名は `prod`（開発は `dev`）
 - 2026-11-03〜11-15 は「稼働 3 台 + 待機 1 台を月 1 回入れ替える」運用をしていたが、altair を開発用にするため廃止した
 - 実行場所の表記: **[Mac]** = kubectl を使う端末、**[node]** = 対象ノードに SSH

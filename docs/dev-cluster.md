@@ -10,7 +10,7 @@
 | MetalLB | 192.168.3.120 | 192.168.3.121 |
 | Argo CD | https://argocd.local | https://argocd-dev.local |
 | 同期するブランチ（kappaas-apps） | `release` | `dev` |
-| 同期するブランチ（kakeibon-apps） | `main` | `dev` |
+| 業務アプリ kakeibon のマニフェスト | kakeibon-apps の `main`（本番の release 切り替え後は `services/kakeibon/overlays/prod`） | `services/kakeibon/overlays/dev`（[kakeibon.md](kakeibon.md)） |
 | root Application | `bootstrap/root-app-prod.yaml` → `applications/overlays/prod` | `bootstrap/root-app-dev.yaml` → `applications/overlays/dev` |
 | 外部公開 | Cloudflare Tunnel（kakeibon.kappa-as.com） | なし（LAN 内のみ） |
 | AWS | IAM Roles Anywhere（本番の CA・KppaasRole） | IAM Roles Anywhere（dev の CA・dev 用ロール） |
@@ -20,17 +20,13 @@
 
 ## 運用フロー
 
-kappaas-apps（このリポジトリ）:
+kappaas-apps（このリポジトリ。業務アプリ kakeibon のマニフェスト `services/kakeibon` も含む）:
 
 ```
 feature ブランチ → dev（altair の Argo CD が同期して確認）→ main（統合。どこにもデプロイされない）→ release（本番が同期）
 ```
 
-kakeibon-apps（業務アプリ）:
-
-```
-feature ブランチ → dev（開発で確認）→ main（本番が同期）
-```
+- 本番の kakeibon は、本番の release 切り替えまで kakeibon-apps リポジトリの `main` を同期している（[kakeibon.md](kakeibon.md)「本番の切り替え」）
 
 - インフラの変更（chart のバージョン上げなど）も同じ流れ。Dependabot の PR は dev ブランチに来る（`.github/dependabot.yml` の `target-branch: dev`）
 - dev → main、main → release は PR でマージする。release へのマージが本番へのリリースになる
@@ -56,7 +52,11 @@ feature ブランチ → dev（開発で確認）→ main（本番が同期）
 
   argocd-config/{applications,repositories}/
   ├── base/
-  └── overlays/{prod,dev}/                    applications/overlays/dev だけ patches/kakeibon-apps-patch.yaml（dev ブランチ）
+  └── overlays/{prod,dev}/                    applications/overlays/{prod,dev} に patches/kakeibon-apps-patch.yaml（app-kakeibon の path・ブランチ）
+
+  services/kakeibon/                          業務アプリ kakeibon（docs/kakeibon.md）
+  ├── base/
+  └── overlays/{prod,dev}/patches/            テーブル・バケット・JWT・ホスト名
 
   charts/<chart>/
   ├── Chart.yaml
@@ -80,7 +80,7 @@ feature ブランチ → dev（開発で確認）→ main（本番が同期）
 
 ### 0. 事前準備
 
-- [ ] **[GitHub]** kappaas-apps と kakeibon-apps に `dev` ブランチを作る（main から）。kappaas-apps には本番用の `release` ブランチも作る（[prod-cluster.md](prod-cluster.md)「base / overlays 構成への移行」）
+- [ ] **[GitHub]** kappaas-apps に `dev` ブランチを作る（main から）。本番用の `release` ブランチも作る（[prod-cluster.md](prod-cluster.md)「base / overlays 構成への移行」）
 - [ ] **[GitHub]** dev 用の OAuth App を作る（Settings → Developer settings → OAuth Apps）
   - Homepage URL: `https://argocd-dev.local`、Authorization callback URL: `https://argocd-dev.local/api/dex/callback`
   - Client ID を `charts/argocd/dev/values.yaml` の `clientID` に書く
@@ -317,12 +317,12 @@ CN=`external-secrets` の証明書で `KappaasDevExternalSecretsRole` を引き�
 
 ### 8. 業務アプリ（kakeibon）
 
-`argocd-config/applications/overlays/dev` が kakeibon-apps の `dev` ブランチ（`components`）を同期する。
+`app-kakeibon` が dev ブランチの `services/kakeibon/overlays/dev` を同期する（[kakeibon.md](kakeibon.md)）。
 
-- [ ] kakeibon-apps 側で開発用の差分を用意する（このリポジトリの範囲外）
-  - DynamoDB テーブル・S3 バケットを本番と分けるか
-  - 外部公開しないので、アクセスは LAN 内（Contour の HTTPProxy で `kakeibon-dev.local` など）
-  - kakeibon-backend の AWS 資格情報（iam-roles-anywhere.md の段階 2。開発用の KakeibonBackend ロールをテンプレートに追加する）
+- [x] 開発用の差分（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、JWT `kakeibon-dev/jwt-secret`、ホスト名 `kakeibon-dev.local`）を `services/kakeibon/overlays/dev` に用意
+- [ ] 開発用の AWS リソース（バケット・JWT・IAM ロール）を作る（kakeibon-dev-aws.md の手順 2・3）
+- [ ] kakeibon-backend の AWS 資格情報（iam-roles-anywhere.md の段階 2。サイドカーと KakeibonBackendDevRole）
+- [ ] **[Mac]** `/etc/hosts` に `192.168.3.121 kakeibon-dev.local`
 
 ---
 

@@ -1,0 +1,11 @@
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: kakeibon-client
+  namespace: kakeibon
+spec:
+  # virtualhost.fqdn は環境ごとに違うので overlays/<env>/patches/client/httpproxy-patch.yaml
+  routes:
+    - services:
+        - name: client
+          port: 3000

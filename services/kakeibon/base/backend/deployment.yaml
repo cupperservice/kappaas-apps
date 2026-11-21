@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kakeibon-backend
+  namespace: kakeibon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kakeibon-backend
+  template:
+    metadata:
+      labels:
+        app: kakeibon-backend
+    spec:
+      imagePullSecrets:
+        - name: kakeibon-ghcr-secret
+      containers:
+        - name: backend
+          image: ghcr.io/cupperservice/kakeibon-backend:0671920b2fc3066bb536b451f159a4dd7a710447
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: kakeibon-backend-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: kakeibon-backend-secret
+                  key: JWT_SECRET
+            - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
+              value: "http://aws-credential-helper.aws-credential-helper.svc.cluster.local:9911"
+            - name: AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE
+              value: "IPv4"
+          resources:
+            requests:
+              cpu: "256m"
+              memory: "512Mi"
+            limits:
+              cpu: "256m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: certs
+          secret:
+            secretName: kakeibon-backend-secrets
+        - name: bin
+          emptyDir: {}

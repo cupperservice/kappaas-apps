@@ -9,7 +9,7 @@
 | IAM の作り方 | CloudFormation（[aws/rolesanywhere.yaml](../aws/rolesanywhere.yaml)）で環境ごとにスタックを作る（`kappaas-dev-rolesanywhere` / `kappaas-prod-rolesanywhere`）。本番も新しいトラストアンカー・プロファイルを作る（下の「AWS 側の手順」の CLI は使わない） |
 | ロール名 | external-secrets: 本番 `KappaasExternalSecretsRole`、開発 `KappaasDevExternalSecretsRole`（kakeibon-backend 用は段階 2 でテンプレートに追加） |
 | サイドカーの ARN | 環境ごとに違うので `charts/external-secrets/{prod,dev}/values.yaml` の `aws.*` に書き、ConfigMap `external-secrets-aws` 経由でサイドカーに渡す（サイドカーの定義は共通の `values.yaml` に 1 つ） |
-| 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（kakeibon-apps。後日） |
+| 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（後日）。マニフェストは kakeibon-apps から `services/kakeibon` に移した（[kakeibon.md](kakeibon.md)）。下の文中の kakeibon-apps の `components/backend/...` は `services/kakeibon/base/backend/...` と読み替える |
 | 共用の aws-credential-helper | 開発: 段階 1 で廃止（`applications/overlays/dev/patches/aws-credential-helper-patch.yaml` で除外）。本番: kakeibon-backend が使うので段階 2 まで残す（KppaasRole のまま） |
 | 開発の kakeibon-backend | AWS の権限は付けない（開発用のテーブル・バケットを用意してから段階 2 で検討） |
 
