@@ -8,5 +8,7 @@ resources:
 # patches/<base のパス>-patch.yaml
 patches:
   - path: patches/backend/configmap-patch.yaml
+  - path: patches/backend/deployment-patch.yaml
+  - path: patches/client/deployment-patch.yaml
   - path: patches/client/httpproxy-patch.yaml
   - path: patches/external-secrets-patch.yaml
