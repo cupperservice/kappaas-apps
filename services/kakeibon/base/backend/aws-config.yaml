@@ -1,0 +1,8 @@
+# kakeibon-backend のサイドカー（aws_signing_helper）に渡す IAM Roles Anywhere の ARN
+# ARN は環境ごとに違うので、値は overlays/<env>/patches/backend/aws-config-patch.yaml に書く（ここには書かない）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kakeibon-backend-aws
+  namespace: kakeibon
+data: {}
