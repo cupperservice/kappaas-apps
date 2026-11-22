@@ -18,7 +18,8 @@
 | altair  | 192.168.3.125 | **開発クラスタ**（別クラスタ。[dev-cluster.md](dev-cluster.md)） |
 
 - etcd は 3 メンバー。1 台の故障に耐える（2 台止まるとクラスタ全体が停止）
-- MetalLB: 192.168.3.120、Argo CD: https://argocd.local（kappaas-apps は `release` を同期。業務アプリ kakeibon は release への切り替えまで kakeibon-apps の `main`、切り替え後は `services/kakeibon/overlays/prod`）
+- MetalLB: 192.168.3.120、Argo CD: https://argocd.local（root-app は `release` の `applications/overlays/prod` を同期。業務アプリ kakeibon は `services/kakeibon/overlays/prod`）
+- 変更は dev → main → release とマージして本番に入れる（release へのマージが本番へのリリース）
 - Mac の kubeconfig のコンテキスト名は `prod`（開発は `dev`）
 - 2026-11-03〜11-15 は「稼働 3 台 + 待機 1 台を月 1 回入れ替える」運用をしていたが、altair を開発用にするため廃止した
 - 実行場所の表記: **[Mac]** = kubectl を使う端末、**[node]** = 対象ノードに SSH
@@ -27,36 +28,97 @@
 
 ---
 
-## base / overlays 構成・release ブランチへの移行（1 回だけ・未実施）
+## base / overlays 構成・release ブランチへの移行（段階 A・B は 2026-11-23 完了、段階 C は未実施）
 
-本番の root-app を `main` / `applications/base` → `release` / `applications/overlays/prod` に切り替える。
+本番の root-app を `main` / `applications/base`（旧構成）から `release` / `applications/overlays/prod` に切り替え、
+dev に入っていた変更（#8〜#18）を本番に入れた。一度に入れず、次の 3 段階に分けた。
 
-新構成は `release` ブランチに置き、root-app を切り替えるまで本番はどこからも参照しない。
-**旧構成の root-app（main / applications/base）が動いている間は、新構成を main に push しない。**
-push すると root-app が新しい base（環境ごとの値なし）を同期し、aws-credential-helper（ARN が消える）と
-cloudflare-tunnel（トンネル設定が消える）が自動同期で壊れる。
+| 段階 | 内容 | 状態 |
+|---|---|---|
+| A | root-app を release に切り替える（構成だけ。中身は変えない） | 2026-11-23 完了 |
+| B | 本番の rolesanywhere スタックを作り、dev → main → release で本番に反映 | 2026-11-23 完了 |
+| C | kakeibon-backend のサイドカーを本番に入れ、共用 aws-credential-helper・KppaasRole を廃止 | 未実施 |
 
-1. 新構成をコミットし、`dev` と `release` ブランチを作って push する（main にはまだ push しない）
-   - kakeibon-apps は `dev` ブランチだけ作る（本番は main のまま）
-2. **[Mac]** 本番に入る内容を確認（全 Application が `release`・`prod/values.yaml` を使う）
-   ```bash
-   git checkout release
-   kubectl kustomize applications/overlays/prod | grep -E 'name:|targetRevision|values.yaml|path:'
-   ```
-3. **[Mac]** root-app を切り替える
+**順番の理由**: 段階 A を最初に行う。旧構成の root-app（main / applications/base）が動いている間に新構成を main に入れると、
+root-app が環境ごとの値の無い base を同期し、aws-credential-helper（ARN が消える）と cloudflare-tunnel（トンネル設定が消える）が
+自動同期で壊れて kakeibon が止まる。段階 A で本番の参照先を release に移してから main を更新する。
+
+### 段階 A: root-app を release に切り替える（2026-11-23 実施）
+
+切り替え時の release は fcbccc1（新構成の骨組みだけ）。中身は今の本番と同じなので、Pod は作り直されない。
+
+1. **[Mac]** 事前確認: 3 台 Ready、etcd の Pod 3 つ Running、Running / Completed 以外の Pod が無い
+2. **[Mac]** 差分の確認（読み取りのみ）
+   - 本番の各 Application の spec と、release の `applications/overlays/prod` の描画を比較 → 変わるのは targetRevision（main → release）・path・helm.valueFiles だけ
+   - 各 chart の `values.yaml` + `prod/values.yaml` を重ねた結果が、main の `values.yaml` と一致。templates・Chart.yaml・argocd-config の base も一致
+   - `kubectl --context prod diff -f bootstrap/root-app-prod.yaml` → path と targetRevision の 2 行だけ
+3. **[Mac]** 切り替え
+
    ```bash
    kubectl --context prod apply -f bootstrap/root-app-prod.yaml
    ```
-4. **[Mac]** 確認
-   ```bash
-   kubectl --context prod -n argocd get app root-app -o jsonpath='{.spec.source.targetRevision} {.spec.source.path}{"\n"}'   # release applications/overlays/prod
-   kubectl --context prod -n argocd get app      # 全 Synced / Healthy（argocd は手動 Sync。APP DIFF が空であること）
-   ```
-   - Application の定義（targetRevision・helm.valueFiles・path）が変わるだけで、各 chart の値は変更前と同じ
-     （共通 + prod を重ねた結果が元の values.yaml と一致することを確認済み）
-5. main に push（本番はもう main を見ていないので影響なし）
 
-- [ ] 移行
+4. **[Mac]** 確認: root-app が `release` / `applications/overlays/prod`、全アプリ Synced / Healthy、app-kakeibon は引き続き kakeibon-apps の main
+   - この時点では `argocd-config/applications/overlays/prod/patches/kakeibon-apps-patch.yaml`（#9）は release に無いので効かない。正常
+
+### 段階 B: dev の変更を本番に入れる（2026-11-23 実施）
+
+1. **[AWS]** 本番の rolesanywhere スタックを作る（`aws/rolesanywhere.yaml`、`Environment=prod`、本番の CA）
+
+   ```bash
+   kubectl --context prod get secret k8s-ca-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/k8s-backup/prod-ca.crt
+   aws cloudformation deploy --region ap-northeast-1 --stack-name kappaas-prod-rolesanywhere \
+     --template-file aws/rolesanywhere.yaml --capabilities CAPABILITY_NAMED_IAM \
+     --parameter-overrides Environment=prod CaCertificate="$(cat ~/k8s-backup/prod-ca.crt)"
+   ```
+
+   - 作られたもの: トラストアンカー `a0d8433e-…`・プロファイル `76d3d14c-…`（`kappaas-prod`）、`KappaasExternalSecretsRole`、`KakeibonBackendRole`（段階 C で使う）
+   - 既存の KppaasRole・旧トラストアンカー・プロファイルには触れない
+2. Outputs の ARN を `charts/external-secrets/prod/values.yaml` に書く（#18）
+   - **このとき不具合が見つかった**: #8 でコミットした `charts/external-secrets/templates/aws-config.yaml` に開発の ARN が直接書かれていた。
+     そのまま本番に入れると、本番の external-secrets が開発のロールを使って認証に失敗していた。values（`aws.*`）から読む形に直した（#18）
+3. 本番に入る差分の確認（release と dev の本番向けの描画を比較）
+
+   | 対象 | 差分 |
+   |---|---|
+   | applications/overlays/prod | なし |
+   | app-kakeibon | 取得元が kakeibon-apps → `services/kakeibon/overlays/prod`。描画は kakeibon-apps main（e5d4188）と完全に一致 |
+   | argocd-repositories | ExternalSecret `kappaas-apps-secret` が増える |
+   | argocd | Certificate `argocd-server`（argocd.local） |
+   | external-secrets | サイドカー・Certificate・ConfigMap（本番の ARN） |
+   | それ以外の chart | 変化なし |
+
+   - 本番クラスタへのサーバー側 dry-run で、増える・変わるリソースがすべて受け付けられることを確認
+4. dev → main（#19）、main → release（#21）をマージ → 本番が同期
+5. 確認
+
+   ```bash
+   kubectl --context prod -n argocd get app                                   # 全 Synced / Healthy
+   kubectl --context prod -n external-secrets get pods -l app.kubernetes.io/name=external-secrets   # 2/2（サイドカー）
+   kubectl --context prod get secretstore,externalsecret -A                    # Ready / SecretSynced
+   ```
+
+   - external-secrets が 2/2、`kappaas-apps-secret` が新しいロール（KappaasExternalSecretsRole）で同期できた。ExternalSecret 5 つすべて SecretSynced
+   - kakeibon の Pod は作り直されず、https://kakeibon.kappa-as.com は 200、ログインできる
+6. `argocd` アプリを手動 Sync（Certificate `argocd-server`）→ Mac で本番の k8s-ca を信頼（[argocd-self-managed.md](argocd-self-managed.md)「サーバー証明書」）→ https://argocd.local が鍵マーク
+7. 古い Secret `kappaas-apps-repo`（手で入れていたリポジトリの認証情報）を削除
+
+戻し方（段階 B の後に問題が出た場合）: main → release のマージを revert する PR を release に入れると、本番は fcbccc1 の状態に戻る。
+external-secrets で問題が出ても、作成済みの Secret は残るので kakeibon はすぐには止まらない。
+
+### 段階 C: kakeibon-backend のサイドカーと共用 helper の廃止（未実施）
+
+[iam-roles-anywhere.md](iam-roles-anywhere.md) の段階 2 の本番分とステップ 4・5。
+
+1. `services/kakeibon/overlays/dev` にあるサイドカー一式（`aws-certificate.yaml`・`aws-config.yaml`・`patches/backend/deployment-patch.yaml` のサイドカー部分）を base に移し、ARN だけを環境ごとにする（本番は `KakeibonBackendRole`、kakeibon-prod）
+2. dev → main → release で本番に反映し、kakeibon（DynamoDB・S3・SES）の動作を確認
+3. 本番の共用 aws-credential-helper（DaemonSet）を廃止する。各ノードの 9911 番ポートが LAN から応答しないことを確認
+4. 1 週間ほど様子を見て、KppaasRole と旧トラストアンカー・プロファイルを削除する
+5. kakeibon-apps リポジトリの認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）を削除する
+
+- [x] 段階 A
+- [x] 段階 B
+- [ ] 段階 C
 
 ---
 

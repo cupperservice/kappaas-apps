@@ -1,5 +1,4 @@
-# kakeibon-backend のサイドカー（aws_signing_helper）に渡す IAM Roles Anywhere の ARN
-# 値は開発の rolesanywhere スタック（kappaas-dev-rolesanywhere）の Outputs
+# kakeibon-backend のサイドカーが使う ARN（開発の rolesanywhere スタック kappaas-dev-rolesanywhere の Outputs）
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -34,7 +34,7 @@ kappaas-apps（このリポジトリ。業務アプリ kakeibon のマニフェ�
 feature ブランチ → dev（altair の Argo CD が同期して確認）→ main（統合。どこにもデプロイされない）→ release（本番が同期）
 ```
 
-- 本番の kakeibon は、本番の release 切り替えまで kakeibon-apps リポジトリの `main` を同期している（[kakeibon.md](kakeibon.md)「本番の切り替え」）
+- 本番の kakeibon も、release の `services/kakeibon/overlays/prod` を同期している（2026-11-23 から。それまでは kakeibon-apps リポジトリの `main`）
 
 - インフラの変更（chart のバージョン上げなど）も同じ流れ。Dependabot の PR は dev ブランチに来る（`.github/dependabot.yml` の `target-branch: dev`）
 - dev → main、main → release は PR でマージする。release へのマージが本番へのリリースになる

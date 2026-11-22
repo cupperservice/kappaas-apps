@@ -15,6 +15,59 @@ spec:
     spec:
       imagePullSecrets:
         - name: kakeibon-ghcr-secret
+      # AWS の資格情報は Pod 内のサイドカー（aws_signing_helper serve、127.0.0.1:9911）から取る（docs/iam-roles-anywhere.md 段階 2）
+      # サイドカーの定義は charts/external-secrets/values.yaml の external-secrets のものと同じ
+      initContainers:
+        # aws_signing_helper を取得する
+        - name: download-helper
+          image: alpine:3.20
+          command:
+            - sh
+            - -c
+            - |
+              wget -qO /opt/bin/aws_signing_helper \
+                https://rolesanywhere.amazonaws.com/releases/1.8.2/X86_64/Linux/Amzn2023/aws_signing_helper && \
+              chmod +x /opt/bin/aws_signing_helper
+          volumeMounts:
+            - name: bin
+              mountPath: /opt/bin
+        # ネイティブサイドカー（restartPolicy: Always）。startupProbe が通るまで backend は起動しない
+        - name: aws-credential-helper
+          image: amazonlinux:2023
+          restartPolicy: Always
+          # ARN は環境ごとの ConfigMap（aws-config.yaml と overlays の aws-config-patch.yaml）から環境変数で受け取る
+          envFrom:
+            - configMapRef:
+                name: kakeibon-backend-aws
+          command:
+            - sh
+            - -c
+            - |
+              exec /opt/bin/aws_signing_helper serve \
+                --certificate /certs/tls.crt \
+                --private-key /certs/tls.key \
+                --trust-anchor-arn "$TRUST_ANCHOR_ARN" \
+                --profile-arn "$PROFILE_ARN" \
+                --role-arn "$ROLE_ARN" \
+                --port 9911
+          # helper は 127.0.0.1 だけで待ち受けるので、Pod IP に接続する tcpSocket probe は使えない。Pod 内から確認する
+          startupProbe:
+            exec:
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+            - name: bin
+              mountPath: /opt/bin
       containers:
         - name: backend
           image: ghcr.io/cupperservice/kakeibon-backend:0671920b2fc3066bb536b451f159a4dd7a710447
@@ -29,8 +82,9 @@ spec:
                 secretKeyRef:
                   name: kakeibon-backend-secret
                   key: JWT_SECRET
+            # Pod 内のサイドカー
             - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
-              value: "http://aws-credential-helper.aws-credential-helper.svc.cluster.local:9911"
+              value: "http://127.0.0.1:9911"
             - name: AWS_EC2_METADATA_SERVICE_ENDPOINT_MODE
               value: "IPv4"
           resources:
@@ -55,8 +109,9 @@ spec:
             periodSeconds: 10
             failureThreshold: 3
       volumes:
+        # サイドカーのクライアント証明書（aws-certificate.yaml）
         - name: certs
           secret:
-            secretName: kakeibon-backend-secrets
+            secretName: kakeibon-backend-aws-cert
         - name: bin
           emptyDir: {}

@@ -4,14 +4,12 @@ kind: Kustomization
 
 resources:
   - ../../base
-  # kakeibon-backend のサイドカー用（本番に入れるときに base へ移す）
-  - aws-certificate.yaml
-  - aws-config.yaml
   # https://kakeibon-dev.local のサーバー証明書
   - kakeibon-client-tls.yaml
 
 # patches/<base のパス>-patch.yaml
 patches:
+  - path: patches/backend/aws-config-patch.yaml
   - path: patches/backend/configmap-patch.yaml
   - path: patches/backend/deployment-patch.yaml
   - path: patches/client/deployment-patch.yaml
