@@ -1,6 +1,10 @@
-# 本番クラスタ用（base のまま。main ブランチ）
+# 本番クラスタ用（release ブランチ）
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
   - ../../base
+
+# patches/<base のファイル名>-patch.yaml
+patches:
+  - path: patches/kakeibon-apps-patch.yaml

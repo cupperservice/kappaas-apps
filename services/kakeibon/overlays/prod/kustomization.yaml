@@ -1,0 +1,12 @@
+# 本番クラスタ用。argocd-config/applications/overlays/prod の app-kakeibon が release ブランチから同期する
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# patches/<base のパス>-patch.yaml
+patches:
+  - path: patches/backend/configmap-patch.yaml
+  - path: patches/client/httpproxy-patch.yaml
+  - path: patches/external-secrets-patch.yaml

@@ -8,7 +8,7 @@
 | 開発 | altair（1 台） | `dev` | https://argocd-dev.local | `dev` | [dev-cluster.md](docs/dev-cluster.md) |
 
 変更は `dev`（開発クラスタに反映して確認）→ `main`（統合。どこにもデプロイされない）→ `release`（本番に反映）の順にマージする。
-業務アプリ（kakeibon-apps）は本番 `main`・開発 `dev`。
+業務アプリ kakeibon のマニフェストも `services/kakeibon` にあり、同じ流れで反映する（[kakeibon.md](docs/kakeibon.md)。本番は release への切り替えまで kakeibon-apps の `main` を同期）。
 
 
 ## cert-manager の CA　を確認する

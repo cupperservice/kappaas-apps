@@ -12,3 +12,18 @@ argo-cd:
     # bootstrap/argocd-dex-secret*.yaml で投入した既存の Secret を使う（秘密情報を Git に入れない）
     secret:
       createSecret: false
+  # argocd-server のサーバー証明書を cert-manager（クラスタの CA k8s-ca）で発行する（Secret argocd-server-tls）
+  # argocd-server は argocd-server-tls があれば自動でそれを使う。無いと自己署名（O=Argo CD）になり、ブラウザで警告が出る
+  # ホスト名（domain）は環境ごとに prod/values.yaml・dev/values.yaml。Mac で k8s-ca を信頼する手順は docs/argocd-self-managed.md
+  server:
+    certificate:
+      enabled: true
+      issuer:
+        kind: ClusterIssuer
+        name: k8s-ca
+      duration: 2160h
+      renewBefore: 360h
+      usages:
+        - server auth
+        - digital signature
+        - key encipherment

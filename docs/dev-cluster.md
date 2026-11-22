@@ -10,27 +10,31 @@
 | MetalLB | 192.168.3.120 | 192.168.3.121 |
 | Argo CD | https://argocd.local | https://argocd-dev.local |
 | 同期するブランチ（kappaas-apps） | `release` | `dev` |
-| 同期するブランチ（kakeibon-apps） | `main` | `dev` |
+| 業務アプリ kakeibon のマニフェスト | kakeibon-apps の `main`（本番の release 切り替え後は `services/kakeibon/overlays/prod`） | `services/kakeibon/overlays/dev`（[kakeibon.md](kakeibon.md)） |
 | root Application | `bootstrap/root-app-prod.yaml` → `applications/overlays/prod` | `bootstrap/root-app-dev.yaml` → `applications/overlays/dev` |
 | 外部公開 | Cloudflare Tunnel（kakeibon.kappa-as.com） | なし（LAN 内のみ） |
 | AWS | IAM Roles Anywhere（本番の CA・KppaasRole） | IAM Roles Anywhere（dev の CA・dev 用ロール） |
 
 - 開発クラスタは本番と完全に別のクラスタ（etcd・CA・Argo CD すべて別）。開発で壊しても本番に影響しない
+- **開発はノード 1 台なので、replicas は 1・PDB は作らない**（2 つにしても冗長化にならない。replicas 1 で PDB の minAvailable 1 を残すと drain が止まる）
+  - Argo CD で管理しているもの: `charts/<chart>/dev/values.yaml`（cert-manager・external-secrets）と `services/kakeibon/overlays/dev/patches/*/deployment-patch.yaml`（kakeibon）で 1 にしている。chart を追加したら dev の values でも 1 にする
+  - coredns は kubeadm が作るもので Argo CD の管理外。手で 1 にする（kubeadm でアップグレードした後にも確認する）
+
+    ```bash
+    kubectl --context dev -n kube-system scale deploy coredns --replicas=1
+    kubectl --context dev get deploy,sts -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,REPLICAS:.spec.replicas | awk 'NR==1 || $3>=2'   # 見出しだけになること
+    ```
 - 実行場所の表記: **[Mac]** = kubectl / helm を使う端末、**[altair]** = altair に SSH
 
 ## 運用フロー
 
-kappaas-apps（このリポジトリ）:
+kappaas-apps（このリポジトリ。業務アプリ kakeibon のマニフェスト `services/kakeibon` も含む）:
 
 ```
 feature ブランチ → dev（altair の Argo CD が同期して確認）→ main（統合。どこにもデプロイされない）→ release（本番が同期）
 ```
 
-kakeibon-apps（業務アプリ）:
-
-```
-feature ブランチ → dev（開発で確認）→ main（本番が同期）
-```
+- 本番の kakeibon は、本番の release 切り替えまで kakeibon-apps リポジトリの `main` を同期している（[kakeibon.md](kakeibon.md)「本番の切り替え」）
 
 - インフラの変更（chart のバージョン上げなど）も同じ流れ。Dependabot の PR は dev ブランチに来る（`.github/dependabot.yml` の `target-branch: dev`）
 - dev → main、main → release は PR でマージする。release へのマージが本番へのリリースになる
@@ -56,20 +60,24 @@ feature ブランチ → dev（開発で確認）→ main（本番が同期）
 
   argocd-config/{applications,repositories}/
   ├── base/
-  └── overlays/{prod,dev}/                    applications/overlays/dev だけ patches/kakeibon-apps-patch.yaml（dev ブランチ）
+  └── overlays/{prod,dev}/                    applications/overlays/{prod,dev} に patches/kakeibon-apps-patch.yaml（app-kakeibon の path・ブランチ）
+
+  services/kakeibon/                          業務アプリ kakeibon（docs/kakeibon.md）
+  ├── base/
+  └── overlays/{prod,dev}/patches/            テーブル・バケット・JWT・ホスト名
 
   charts/<chart>/
   ├── Chart.yaml
   ├── values.yaml        prod / dev 共通の値
   ├── prod/values.yaml   本番の値
-  └── dev/values.yaml    開発の値（cloudflare-tunnel は開発に入れないので無し）
+  └── dev/values.yaml    開発の値（cloudflare-tunnel・aws-credential-helper は開発に入れないので無し）
   ```
 
   - patch は base のファイルごとに 1 つ、`overlays/<env>/patches/<base のファイル名>-patch.yaml` に置く
   - patch は strategic merge 形式（Application のマニフェストの一部を書く）。`metadata.name` で対象が決まるので kustomization.yaml に target は書かない
   - リスト（`valueFiles`、`sources`）は丸ごと置き換わるので、patch には全要素を書く（例: `valueFiles: [values.yaml, dev/values.yaml]`）
   - Application は base で `values.yaml` を指定し、patch で `prod/values.yaml` / `dev/values.yaml` を後ろに追加する（後ろが優先）
-  - 現在、環境で値が違うのは argocd（URL・dex）、aws-credential-helper（IAM Roles Anywhere の ARN）、cloudflare-tunnel（本番のみ）
+  - 現在、環境で値が違うのは argocd（URL・dex）、external-secrets（サイドカーが使う IAM Roles Anywhere の ARN）、aws-credential-helper（本番のみ。kakeibon-backend 用）、cloudflare-tunnel（本番のみ）
   - base に Application を追加したら、prod・dev の両方に patch を作って kustomization.yaml に追加する
   - 開発用の bootstrap は `bootstrap/*-dev.yaml`
 - **Argo CD 自身（`argocd` アプリ）は手動 Sync**（[argocd-self-managed.md](argocd-self-managed.md)）。本番より先に開発で Sync して確認する
@@ -80,7 +88,7 @@ feature ブランチ → dev（開発で確認）→ main（本番が同期）
 
 ### 0. 事前準備
 
-- [ ] **[GitHub]** kappaas-apps と kakeibon-apps に `dev` ブランチを作る（main から）。kappaas-apps には本番用の `release` ブランチも作る（[prod-cluster.md](prod-cluster.md)「base / overlays 構成への移行」）
+- [ ] **[GitHub]** kappaas-apps に `dev` ブランチを作る（main から）。本番用の `release` ブランチも作る（[prod-cluster.md](prod-cluster.md)「base / overlays 構成への移行」）
 - [ ] **[GitHub]** dev 用の OAuth App を作る（Settings → Developer settings → OAuth Apps）
   - Homepage URL: `https://argocd-dev.local`、Authorization callback URL: `https://argocd-dev.local/api/dex/callback`
   - Client ID を `charts/argocd/dev/values.yaml` の `clientID` に書く
@@ -240,10 +248,14 @@ kubectl --context dev apply -f bootstrap/argocd-dex-secret-dev.yaml      # argoc
 cd charts/argocd && helm dependency build \
   && helm --kube-context dev install argocd . -n argocd -f values.yaml -f dev/values.yaml \
   && rm -rf charts Chart.lock && cd -
-kubectl --context dev apply -f bootstrap/argocd-repo-secret.yaml         # リポジトリの認証情報
 kubectl --context dev apply -f bootstrap/argo-server-dev.yaml            # HTTPProxy argocd-dev.local
 kubectl --context dev apply -f bootstrap/root-app-dev.yaml
+# external-secrets が入って CRD ができてから（kubectl --context dev get crd secretstores.external-secrets.io）
+kubectl --context dev apply -f bootstrap/argocd-secrets.yaml             # SecretStore argocd-secret-store
 ```
+
+- リポジトリの認証情報（kappaas-apps・kakeibon-apps）は `argocd-config/repositories` の ExternalSecret が Secrets Manager から作る。手で apply しない
+  （kappaas-apps は public なので、認証情報が無くても root-app は同期できる）
 
 - root-app-dev が `applications/overlays/dev` を同期し、cert-manager・external-secrets などが入る（cloudflare-tunnel は入らない）
 - この時点では aws-credential-helper の ARN が未設定（`REPLACE_WITH_...`）なので、aws-credential-helper と external-secrets の SecretStore はエラーになる。次の 7 で直す
@@ -252,6 +264,9 @@ kubectl --context dev apply -f bootstrap/root-app-dev.yaml
 ### 7. AWS: dev 用 IAM Roles Anywhere
 
 altair の cert-manager は本番と別の CA を作るので、本番のトラストアンカーでは認証できない。dev 用に作る。
+
+開発では共用の aws-credential-helper（DaemonSet）は使わない。external-secrets のコントローラーの Pod 内のサイドカーが、
+CN=`external-secrets` の証明書で `KappaasDevExternalSecretsRole` を引き受ける（[iam-roles-anywhere.md](iam-roles-anywhere.md)）。
 
 1. **[Mac]** dev の CA 証明書を取り出す
 
@@ -262,30 +277,61 @@ altair の cert-manager は本番と別の CA を作るので、本番のトラ�
    openssl x509 -in ~/k8s-backup/dev-ca.crt -noout -subject -enddate
    ```
 
-2. **[AWS]**（ap-northeast-1）
-   - IAM Roles Anywhere のトラストアンカーを作成（ソース: 外部証明書バンドル = dev-ca.crt）
-   - ロール `KappaasDevRole` を作成
-     - 信頼ポリシー: `rolesanywhere.amazonaws.com`、条件に dev のトラストアンカー ARN（`aws:SourceArn`）と証明書の CN（`aws:PrincipalTag/x509Subject/CN` = `k8s-workload`）
-     - 権限: 開発で使う Secrets Manager のキーの読み取りのみ（`kappaas-apps/repositories/*` など）。本番の DynamoDB / S3 / SES は付けない
-   - プロファイルを作成（ロール: KappaasDevRole）
-3. ARN を `charts/aws-credential-helper/dev/values.yaml` に書いて dev ブランチに push
+2. **[Mac]** CloudFormation でトラストアンカー・ロール・プロファイルを作る（テンプレート: [aws/rolesanywhere.yaml](../aws/rolesanywhere.yaml)。`Environment=dev`）
+
+   | リソース | 名前（dev） | 内容 |
+   |---|---|---|
+   | トラストアンカー | `kappaas-dev` | dev の CA 証明書（dev-ca.crt） |
+   | ロール | `KappaasDevExternalSecretsRole` | 信頼ポリシー: dev のトラストアンカー（`aws:SourceArn`）かつ CN=`external-secrets`。権限: Secrets Manager の読み取り（dev の既定は `kappaas-apps/repositories/*` のみ） |
+   | プロファイル | `kappaas-dev` | KappaasDevExternalSecretsRole |
+
+   ```bash
+   # リポジトリのルートで。IAM ロールを作れる権限の AWS プロファイルで実行
+   aws cloudformation validate-template --template-body file://aws/rolesanywhere.yaml
+   aws cloudformation deploy --region ap-northeast-1 \
+     --stack-name kappaas-dev-rolesanywhere \
+     --template-file aws/rolesanywhere.yaml \
+     --capabilities CAPABILITY_NAMED_IAM \
+     --parameter-overrides Environment=dev CaCertificate="$(cat ~/k8s-backup/dev-ca.crt)"
+
+   aws cloudformation describe-stacks --region ap-northeast-1 --stack-name kappaas-dev-rolesanywhere \
+     --query 'Stacks[0].Outputs' --output table      # TrustAnchorArn / ProfileArn / ExternalSecretsRoleArn
+   ```
+
+   - 名前と既定の権限は、テンプレートの `Mappings`（`EnvironmentMap`）で環境ごとに決まる。スタックは環境ごとに分ける（`kappaas-<env>-rolesanywhere`）
+   - 開発クラスタを作り直して CA が変わったら、新しい dev-ca.crt で同じ deploy を再実行する（トラストアンカーの証明書が置き換わる）
+   - 読み取りを許可するシークレットを変えるときは、`SecretArnPatterns` を指定して再実行する（カンマ区切り。指定すると既定は使われないので、必要なものをすべて書く）
+
+     ```bash
+     ... --parameter-overrides Environment=dev CaCertificate="$(cat ~/k8s-backup/dev-ca.crt)" \
+       SecretArnPatterns="arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kappaas-apps/repositories/*,arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:<追加するシークレット>/*"
+     ```
+
+   - 本番（`Environment=prod`）も同じテンプレートで作る（[iam-roles-anywhere.md](iam-roles-anywhere.md)「段階 1 の手順」）
+3. Outputs の 3 つの ARN を `charts/external-secrets/dev/values.yaml` の `aws.trustAnchorArn` / `profileArn` / `roleArn` に書いて dev ブランチに push
 4. **[Mac]** 確認
 
    ```bash
-   kubectl --context dev -n aws-credential-helper get pods                  # Running
+   kubectl --context dev -n external-secrets get certificate external-secrets-aws        # READY True
+   kubectl --context dev -n external-secrets get pods -l app.kubernetes.io/name=external-secrets   # READY 2/2
+   # サイドカーが引き受けたロール名（KappaasDevExternalSecretsRole）
+   kubectl --context dev -n external-secrets exec deploy/external-secrets -c aws-credential-helper -- sh -c '
+     T=$(curl -s -X PUT http://127.0.0.1:9911/latest/api/token -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+     curl -s -H "X-aws-ec2-metadata-token: $T" http://127.0.0.1:9911/latest/meta-data/iam/security-credentials/; echo'
    kubectl --context dev -n argocd get secretstore,externalsecret           # Ready / SecretSynced
    ```
 
-- [iam-roles-anywhere.md](iam-roles-anywhere.md) のサイドカー化を進めた場合は、dev も同じ構成にする（ロールを external-secrets 用・kakeibon-backend 用に分け、各 chart の dev/values.yaml に置く）
+- 開発の kakeibon-backend には AWS の権限を付けていない（DynamoDB / S3 / SES は使えない）。開発用のテーブル・バケットを用意してから検討する
 
 ### 8. 業務アプリ（kakeibon）
 
-`argocd-config/applications/overlays/dev` が kakeibon-apps の `dev` ブランチ（`components`）を同期する。
+`app-kakeibon` が dev ブランチの `services/kakeibon/overlays/dev` を同期する（[kakeibon.md](kakeibon.md)）。
 
-- [ ] kakeibon-apps 側で開発用の差分を用意する（このリポジトリの範囲外）
-  - DynamoDB テーブル・S3 バケットを本番と分けるか
-  - 外部公開しないので、アクセスは LAN 内（Contour の HTTPProxy で `kakeibon-dev.local` など）
-  - kakeibon-backend の AWS 資格情報（KappaasDevRole に必要な権限を足す）
+- [x] 開発用の差分（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、JWT `kakeibon-dev/jwt-secret`、ホスト名 `kakeibon-dev.local`）を `services/kakeibon/overlays/dev` に用意
+- [x] 開発用の AWS リソース（バケット・JWT・IAM ロール）を作る（[kakeibon-dev-aws.md](kakeibon-dev-aws.md) の手順 2・3）
+- [x] kakeibon-backend の AWS 資格情報（iam-roles-anywhere.md の段階 2。サイドカーと KakeibonBackendDevRole）
+- [x] **[Mac]** `/etc/hosts` に `192.168.3.121 kakeibon-dev.local`
+- [x] https://kakeibon-dev.local で開ける（2026-11-22 は HTTP だけだったが、その後 HTTPS にした。HTTP は HTTPS にリダイレクト）
 
 ---
 
@@ -301,6 +347,20 @@ kubectl --context dev -n argocd get app -o custom-columns=NAME:.metadata.name,RE
 
 - [ ] https://argocd-dev.local に GitHub でログインできる
 - [ ] dev ブランチに軽微な変更を push → 開発だけに反映され、本番（https://argocd.local）には反映されない
+
+## ブラウザから開けないとき
+
+`curl` では開けるのにブラウザでは開けない場合は、ブラウザ側の問題であることが多い（2026-11 に argocd-dev.local・kakeibon-dev.local で発生）。
+
+| 症状 | 原因と対処 |
+|---|---|
+| `ERR_ADDRESS_UNREACHABLE`。Edge では開けるのに Chrome だけ開けない、など | macOS の「ローカルネットワーク」の許可。「システム設定」→「プライバシーとセキュリティ」→「ローカルネットワーク」に同じアプリ（Google Chrome など）が複数並ぶことがある（補助プログラムや更新のたびに項目が増えるため）。**全部オン**にして ⌘Q で終了 → 起動。それでも駄目なら **Mac を再起動**（どちらの件も再起動で直った） |
+| `argocd-dev.local` とだけ入力すると開けない | Argo CD は HTTPS（443）だけ。`https://argocd-dev.local/` と入力する |
+| Argo CD で「保護されていない接続」 | Mac が開発の k8s-ca を信頼していない。[argocd-self-managed.md](argocd-self-managed.md)「サーバー証明書」の手順で信頼する。issuer が `O=Argo CD` のままなら、`argocd` アプリを Sync していない（Certificate `argocd-server` が無い） |
+| kakeibon-dev.local で「保護されていない接続」 | Argo CD と同じく、Mac が開発の k8s-ca を信頼していない（[argocd-self-managed.md](argocd-self-managed.md)「サーバー証明書」）。証明書は Contour が終端する `kakeibon-client-tls`（`services/kakeibon/overlays/dev/kakeibon-client-tls.yaml`） |
+| 名前解決に約 5 秒かかる | `.local` は macOS では mDNS（Bonjour）扱いで、IPv6 を探してから `/etc/hosts` の IPv4 を使うため。初回だけで、正常 |
+| `host argocd-dev.local` が NXDOMAIN | `host` は `/etc/hosts` を見ない。`dscacheutil -q host -a name argocd-dev.local` で確認する |
+| 古い失敗が残っている | Chrome の `chrome://net-internals/#dns` で Clear host cache、`#sockets` で Flush socket pools |
 
 ## 作り直す / 本番に戻す
 

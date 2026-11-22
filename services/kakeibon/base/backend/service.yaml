@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: kakeibon
+spec:
+  selector:
+    app: kakeibon-backend
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080

@@ -3,3 +3,4 @@ kind: Kustomization
 
 resources:
   - kakeibon-apps.yaml
+  - kappaas-apps.yaml

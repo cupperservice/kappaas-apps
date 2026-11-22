@@ -1,5 +1,37 @@
 # IAM Roles Anywhere のロール分割とサイドカー化（external-secrets / kakeibon-backend）
 
+## 環境分割後の実施方針（2026-11-16 追記）
+
+この文書は本番 / 開発に分ける前（2026-11-14）に書いた。今は次の方針で進める。下の設計・ポリシーの考え方はそのまま有効。
+
+| 項目 | 方針 |
+|---|---|
+| IAM の作り方 | CloudFormation（[aws/rolesanywhere.yaml](../aws/rolesanywhere.yaml)）で環境ごとにスタックを作る（`kappaas-dev-rolesanywhere` / `kappaas-prod-rolesanywhere`）。本番も新しいトラストアンカー・プロファイルを作る（下の「AWS 側の手順」の CLI は使わない） |
+| ロール名 | external-secrets: 本番 `KappaasExternalSecretsRole`、開発 `KappaasDevExternalSecretsRole`（kakeibon-backend 用は段階 2 でテンプレートに追加） |
+| サイドカーの ARN | 環境ごとに違うので `charts/external-secrets/{prod,dev}/values.yaml` の `aws.*` に書き、ConfigMap `external-secrets-aws` 経由でサイドカーに渡す（サイドカーの定義は共通の `values.yaml` に 1 つ） |
+| 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（**開発は実施済み**: `services/kakeibon/overlays/dev` の `aws-certificate.yaml`・`aws-config.yaml`・`patches/backend/deployment-patch.yaml`。本番は本番の rolesanywhere スタック作成後に base へ移す）。マニフェストは kakeibon-apps から `services/kakeibon` に移した（[kakeibon.md](kakeibon.md)）。下の文中の kakeibon-apps の `components/backend/...` は `services/kakeibon/base/backend/...` と読み替える |
+| 共用の aws-credential-helper | 開発: 段階 1 で廃止（`applications/overlays/dev/patches/aws-credential-helper-patch.yaml` で除外）。本番: kakeibon-backend が使うので段階 2 まで残す（KppaasRole のまま） |
+| 開発の kakeibon-backend | サイドカーで `KakeibonBackendDevRole` を使う（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、SES は共用。docs/kakeibon-dev-aws.md） |
+| 本番テーブル | 本番は 2026-11-19 に `kakeibon-dev` から `kakeibon-prod` に移した（[kakeibon-dev-aws.md](kakeibon-dev-aws.md) の手順 1）。下の文中の本番の `kakeibon-dev` は `kakeibon-prod` と読み替える（aws/rolesanywhere.yaml の KakeibonBackendRole は kakeibon-prod を指す） |
+
+### 段階 1 の手順（external-secrets）
+
+1. **[AWS]** 開発スタックを更新（Outputs の ExternalSecretsRoleArn が `KappaasDevExternalSecretsRole`）。手順は [dev-cluster.md](dev-cluster.md) の 7
+2. dev ブランチに push → 開発クラスタで下の「2. external-secrets にサイドカーを追加」の確認（`--context dev`）
+3. **[AWS]** 本番スタックを作成（`Environment=prod`、本番の CA）→ Outputs の ARN を `charts/external-secrets/prod/values.yaml` に書く
+   ```bash
+   kubectl --context prod get secret k8s-ca-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/k8s-backup/prod-ca.crt
+   aws cloudformation deploy --region ap-northeast-1 --stack-name kappaas-prod-rolesanywhere \
+     --template-file aws/rolesanywhere.yaml --capabilities CAPABILITY_NAMED_IAM \
+     --parameter-overrides Environment=prod CaCertificate="$(cat ~/k8s-backup/prod-ca.crt)"
+   ```
+4. dev → main → release → 本番で同じ確認（`--context prod`）。本番の旧 helper（DaemonSet）は残るので、問題があれば revert で戻せる
+
+- [ ] 開発スタック更新
+- [ ] 開発で確認
+- [ ] 本番スタック作成・prod/values.yaml に ARN
+- [ ] 本番で確認
+
 ## 現状（2026-11-14）
 
 ```
@@ -74,7 +106,8 @@ kakeibon-backend の Pod（kakeibon-apps リポジトリ）
 - kakeibon-backend の AWS 利用（`kakeibon/backend/src/services/{dynamo,s3,ses}.ts`、ConfigMap `kakeibon-backend-config`）
   - DynamoDB テーブル `kakeibon-dev`（インデックスあり）: Get / Put / Delete / Query / Scan / BatchGet / BatchWrite / TransactWrite
     - TransactWrite は Put / Delete だけで構成され、ConditionCheck や Update は使っていない
-  - S3 バケット `kakeibo-data-bucket`、`kakeibo-user-bucket`: GetObject / PutObject / DeleteObject / DeleteObjects、署名付き URL
+  - S3 バケット `kakeibo-data-bucket`: GetObject / PutObject / DeleteObject / DeleteObjects、署名付き URL
+    - `kakeibo-user-bucket` は使っていない（2026-11-17 確認）。KakeibonBackendRole（aws/rolesanywhere.yaml）には権限を付けない。下の権限ポリシーの例に残っている user バケットの行は、今の KppaasRole の内容
   - SES: `SendEmail`（送信元 `noreply@kawashima-kazuh.com`）
   - Secrets Manager は直接使っていない（JWT は ExternalSecret 経由）
 - kakeibon-backend の Deployment には、どのコンテナにもマウントされていない volume `certs`（Secret `kakeibon-backend-secrets`、クラスタに存在しない）と `bin` が残っている。以前サイドカーを試したときの名残と思われる。今回のサイドカーで置き換える
@@ -247,6 +280,9 @@ aws rolesanywhere update-profile --profile-id 591bccad-ba10-4397-b798-5de2d5795f
 
 ### external-secrets: charts/external-secrets（このリポジトリ）
 
+> **実装済み（段階 1）**: 実際のファイルは `charts/external-secrets/templates/aws-certificate.yaml`・`templates/aws-config.yaml`・`values.yaml`・`{prod,dev}/values.yaml`。
+> 下の例との違い: ARN を直接書かず ConfigMap `external-secrets-aws` から環境変数で渡す（`envFrom` と `sh -c 'exec aws_signing_helper serve ... "$ROLE_ARN"'`）。
+
 **Certificate（新規）** `charts/external-secrets/templates/aws-certificate.yaml`
 
 ```yaml
@@ -315,8 +351,8 @@ external-secrets:
         - --port
         - "9911"
       startupProbe:                            # 通るまで ESO 本体を起動しない
-        tcpSocket:
-          port: 9911
+        exec:                                  # helper は 127.0.0.1 だけで待ち受けるので tcpSocket（Pod IP に接続）は使えない
+          command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
         periodSeconds: 2
         failureThreshold: 30
       resources:
@@ -407,8 +443,8 @@ spec:
             - --port
             - "9911"
           startupProbe:                        # 通るまで backend を起動しない
-            tcpSocket:
-              port: 9911
+            exec:                              # helper は 127.0.0.1 だけで待ち受けるので tcpSocket（Pod IP に接続）は使えない
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
             periodSeconds: 2
             failureThreshold: 30
           resources:
@@ -573,7 +609,7 @@ aws iam delete-role --role-name KppaasRole
 
 ## 未確認事項
 
-- [ ] SES の ID がドメイン単位（`kawashima-kazuh.com`）かアドレス単位（`noreply@kawashima-kazuh.com`）か → KakeibonBackendRole の SES の Resource を決める
+- [x] SES の ID がドメイン単位（`kawashima-kazuh.com`）かアドレス単位（`noreply@kawashima-kazuh.com`）か → **ドメイン単位**（2026-11-16 確認。スタック `kakeibon-ses`）。KakeibonBackendRole の SES の Resource は `identity/kawashima-kazuh.com` のまま
 - [ ] Roles Anywhere プロファイルに `managedPolicyArns` / `sessionPolicy` が設定されていないか（設定されていれば、新ロールの権限がそれで削られないか）
 
 ---

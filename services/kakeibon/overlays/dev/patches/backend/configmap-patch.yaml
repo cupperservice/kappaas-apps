@@ -1,0 +1,10 @@
+# 開発の S3 バケット・DynamoDB テーブル（docs/kakeibon-dev-aws.md）
+# S3_USER_BUCKET_NAME は使っていないので設定しない
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kakeibon-backend-config
+  namespace: kakeibon
+data:
+  S3_DATA_BUCKET_NAME: "kakeibo-data-bucket-dev"
+  DYNAMODB_TABLE_NAME: "kakeibon-dev"
