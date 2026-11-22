@@ -123,7 +123,9 @@ kubectl --context prod apply -f bootstrap/argocd-secrets.yaml   # SecretStore ar
 
 ---
 
-## リポジトリの認証情報を ESO 管理に移す（1 回だけ・未実施）
+## リポジトリの認証情報を ESO 管理に移す（1 回だけ・完了: 開発 2026-11-16、本番 2026-11-23）
+
+> 完了済み。下の手順は記録として残す。本番は prod-cluster.md の段階 B（#21）で `kappaas-apps-secret` が同期され、古い `kappaas-apps-repo` を削除した。
 
 以前は `bootstrap/argocd-repo-secret.yaml`（Secret `kappaas-apps-repo`）を kubectl apply していた。
 これを ExternalSecret `kappaas-apps-secret`（`argocd-config/repositories/base/kappaas-apps.yaml`）に置き換える。
@@ -153,4 +155,5 @@ kubectl --context prod apply -f bootstrap/argocd-secrets.yaml   # SecretStore ar
 
 4. Mac の `bootstrap/argocd-repo-secret.yaml`（gitignore 済み）を削除する（PAT が平文で残っているため）
 
-- [ ] 移行
+- [x] 移行（開発・本番とも `kappaas-apps-secret` が SecretSynced、`kappaas-apps-repo` は削除済み）
+- [ ] Mac の `bootstrap/argocd-repo-secret.yaml` の削除（手元のファイルなので各自で確認）
