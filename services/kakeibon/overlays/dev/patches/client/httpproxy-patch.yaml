@@ -1,4 +1,5 @@
 # LAN 内のホスト名（Mac の /etc/hosts に MetalLB の IP で登録する）
+# 開発は HTTPS（Contour が TLS を終端。証明書は kakeibon-client-tls.yaml）。HTTP でのアクセスは Contour が HTTPS にリダイレクトする
 apiVersion: projectcontour.io/v1
 kind: HTTPProxy
 metadata:
@@ -7,3 +8,5 @@ metadata:
 spec:
   virtualhost:
     fqdn: kakeibon-dev.local
+    tls:
+      secretName: kakeibon-client-tls
