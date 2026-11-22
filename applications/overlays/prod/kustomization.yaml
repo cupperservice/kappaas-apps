@@ -1,0 +1,18 @@
+# 本番クラスタ（sirius / capella / spica）用。bootstrap/root-app-prod.yaml が release ブランチから同期する
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+# patches/<base のファイル名>-patch.yaml
+patches:
+  - path: patches/argocd-applications-patch.yaml
+  - path: patches/argocd-patch.yaml
+  - path: patches/argocd-repositories-patch.yaml
+  - path: patches/aws-credential-helper-patch.yaml
+  - path: patches/cert-manager-patch.yaml
+  - path: patches/cloudflare-tunnel-patch.yaml
+  - path: patches/csi-driver-smb-patch.yaml
+  - path: patches/external-secrets-patch.yaml
+  - path: patches/metrics-server-patch.yaml

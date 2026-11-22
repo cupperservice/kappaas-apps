@@ -1,0 +1,10 @@
+# 本番の S3 バケット・DynamoDB テーブル
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kakeibon-backend-config
+  namespace: kakeibon
+data:
+  S3_DATA_BUCKET_NAME: "kakeibo-data-bucket"
+  S3_USER_BUCKET_NAME: "kakeibo-user-bucket"
+  DYNAMODB_TABLE_NAME: "kakeibon-prod"

@@ -1,0 +1,10 @@
+# 開発は dev ブランチの services/kakeibon/overlays/dev を同期する
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: app-kakeibon
+  namespace: argocd
+spec:
+  source:
+    path: services/kakeibon/overlays/dev
+    targetRevision: dev

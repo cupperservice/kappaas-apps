@@ -11,6 +11,9 @@ spec:
     repoURL: https://github.com/cupperservice/kappaas-apps.git
     path: charts/metrics-server
     targetRevision: main
+    helm:
+      valueFiles:
+        - values.yaml
   destination:
     server: https://kubernetes.default.svc
     namespace: metrics-server

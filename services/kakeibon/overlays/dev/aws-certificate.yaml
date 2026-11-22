@@ -1,0 +1,24 @@
+# kakeibon-backend のサイドカー（aws_signing_helper）が IAM Roles Anywhere で使うクライアント証明書
+# CN は aws/rolesanywhere.yaml の KakeibonBackendRole の信頼ポリシー（x509Subject/CN）と合わせる
+# 今は開発だけ。本番に入れるとき（本番の rolesanywhere スタック作成後）に base へ移す（docs/iam-roles-anywhere.md 段階 2）
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kakeibon-backend-aws
+  namespace: kakeibon
+spec:
+  commonName: kakeibon-backend
+  dnsNames:
+    - kakeibon-backend
+  secretName: kakeibon-backend-aws-cert
+  duration: 720h
+  renewBefore: 72h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - digital signature
+    - client auth
+  issuerRef:
+    name: k8s-ca
+    kind: ClusterIssuer

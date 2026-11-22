@@ -1,0 +1,10 @@
+# 本番クラスタ用（values.yaml に重ねる）
+cloudflare-tunnel:
+  cloudflare:
+    account: "ec535a19b1b50b94780f92c9b57a0dfa"
+    tunnelName: "k8s-on-prem"
+    tunnelId: "ab2f1684-8428-4779-a5ad-39bdb5813e5d"
+    secretName: cloudflare-tunnel-credentials
+    ingress:
+      - hostname: kakeibon.kappa-as.com
+        service: http://client.kakeibon.svc.cluster.local:3000

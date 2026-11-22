@@ -1,9 +1,11 @@
 # Dependabot: Helm チャートの依存とコンテナイメージの更新 PR を作る
-# main は Argo CD が自動同期するので、PR はマージした時点で本番に反映される。
+# PR は dev ブランチに来る。マージすると開発クラスタ（altair）に反映されるので、そこで確認してから
+# dev → main → release とマージする（release をマージした時点で本番に反映される）。
 # マージ前に必ずリリースノート（特にメジャーバージョン）を確認すること。
 version: 2
 updates:
   - package-ecosystem: helm
+    target-branch: dev
     directories:
       - /charts/argocd
       - /charts/cert-manager
@@ -23,6 +25,7 @@ updates:
       prefix: deps
 
   - package-ecosystem: docker
+    target-branch: dev
     directories:
       - /charts/aws-credential-helper
     schedule:

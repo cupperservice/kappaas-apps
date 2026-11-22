@@ -1,0 +1,7 @@
+# 開発は外部公開しないので cloudflare-tunnel を入れない
+$patch: delete
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cloudflare-tunnel
+  namespace: argocd

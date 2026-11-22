@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kakeibon-client
+  namespace: kakeibon
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kakeibon-client
+  template:
+    metadata:
+      labels:
+        app: kakeibon-client
+    spec:
+      imagePullSecrets:
+        - name: kakeibon-ghcr-secret
+      containers:
+        - name: client
+          image: ghcr.io/cupperservice/kakeibon-client:70076d78529240644a7f4667a4788c5e0b914b24
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: kakeibon-client-config
+          resources:
+            requests:
+              cpu: "256m"
+              memory: "512Mi"
+            limits:
+              cpu: "256m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3

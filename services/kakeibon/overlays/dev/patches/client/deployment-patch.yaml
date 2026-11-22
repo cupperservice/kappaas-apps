@@ -1,0 +1,8 @@
+# 開発は altair 1 台なので 1 つで十分（本番は base の 2 のまま）
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kakeibon-client
+  namespace: kakeibon
+spec:
+  replicas: 1

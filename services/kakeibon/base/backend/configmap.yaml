@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kakeibon-backend-config
+  namespace: kakeibon
+# 環境ごとの値（S3 のバケット・DynamoDB のテーブル）は overlays/<env>/patches/backend/configmap-patch.yaml
+data:
+  NODE_ENV: "production"
+  AWS_REGION: "ap-northeast-1"
+  SES_FROM_ADDRESS: "noreply@kawashima-kazuh.com"

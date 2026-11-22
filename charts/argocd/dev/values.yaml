@@ -1,0 +1,19 @@
+# 開発クラスタ（altair）用（values.yaml に重ねる）
+# GitHub の OAuth App はコールバック URL が 1 つなので、dev 用に別の OAuth App を作る（docs/dev-cluster.md）
+argo-cd:
+  configs:
+    cm:
+      url: https://argocd-dev.local
+      dex.config: |
+        connectors:
+          - type: github
+            id: github
+            name: GitHub
+            config:
+              clientID: Ov23liWDM1XMNctskvAm
+              clientSecret: $dex.github.clientSecret
+              redirectURI: https://argocd-dev.local/api/dex/callback
+  # サーバー証明書のホスト名（values.yaml の server.certificate）
+  server:
+    certificate:
+      domain: argocd-dev.local

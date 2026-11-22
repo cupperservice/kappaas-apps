@@ -1,0 +1,215 @@
+AWSTemplateFormatVersion: "2010-09-09"
+# クラスタ用の IAM Roles Anywhere（トラストアンカー・ロール・プロファイル）。Environment で dev / prod を選ぶ。
+# スタックは環境ごとに分ける（kappaas-dev-rolesanywhere / kappaas-prod-rolesanywhere）。手順は docs/dev-cluster.md の 7。
+# ロールは利用者ごとに分ける（docs/iam-roles-anywhere.md）。external-secrets コントローラー用と kakeibon-backend 用。
+# Description は CloudFormation で日本語が「?」に化けるので英語で書く
+Description: IAM Roles Anywhere for a kappaas cluster - trust anchor, role and profile
+
+Parameters:
+  # dev = 開発クラスタ（altair）、prod = 本番クラスタ（sirius / capella / spica）
+  Environment:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Target cluster (dev or prod)
+  # そのクラスタの cert-manager の CA 証明書（PEM）
+  # kubectl --context <env> get secret k8s-ca-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d
+  CaCertificate:
+    Type: String
+    Description: PEM of the cluster's cert-manager CA (secret k8s-ca-secret in cert-manager)
+  # 読み取りを許可する Secrets Manager の ARN（ワイルドカード可、カンマ区切り）
+  # 空なら環境ごとの既定（下の Mappings の SecretArns）を使う
+  SecretArnPatterns:
+    Type: CommaDelimitedList
+    Default: ""
+    Description: Secrets Manager ARNs (wildcards allowed, comma separated) the role can read. Empty = per-environment default
+
+Mappings:
+  EnvironmentMap:
+    dev:
+      Name: kappaas-dev
+      ExternalSecretsRoleName: KappaasDevExternalSecretsRole
+      # Argo CD のリポジトリ認証情報（argocd-config/repositories）、イメージ取得用の PAT、開発の kakeibon のシークレット
+      SecretArns:
+        - arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kappaas-apps/repositories/*
+        - arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kappaas-apps/ghcr/*
+        - arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kakeibon-dev/*
+      # kakeibon-backend が使う DynamoDB テーブル・S3 バケット（services/kakeibon/overlays/dev と合わせる）
+      KakeibonBackendRoleName: KakeibonBackendDevRole
+      KakeibonTableArn: arn:aws:dynamodb:ap-northeast-1:391726422976:table/kakeibon-dev
+      KakeibonBucketArns:
+        - arn:aws:s3:::kakeibo-data-bucket-dev
+      KakeibonObjectArns:
+        - arn:aws:s3:::kakeibo-data-bucket-dev/*
+    prod:
+      Name: kappaas-prod
+      ExternalSecretsRoleName: KappaasExternalSecretsRole
+      # 現在の本番ロール（KppaasRole）の external-secrets 用の権限と同じ範囲
+      SecretArns:
+        - arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kappaas-apps/*
+        - arn:aws:secretsmanager:ap-northeast-1:391726422976:secret:kakeibon/*
+      # kakeibon-backend が使う DynamoDB テーブル・S3 バケット（services/kakeibon/overlays/prod と合わせる）
+      # kakeibo-user-bucket は使っていないので権限を付けない
+      KakeibonBackendRoleName: KakeibonBackendRole
+      KakeibonTableArn: arn:aws:dynamodb:ap-northeast-1:391726422976:table/kakeibon-prod
+      KakeibonBucketArns:
+        - arn:aws:s3:::kakeibo-data-bucket
+      KakeibonObjectArns:
+        - arn:aws:s3:::kakeibo-data-bucket/*
+
+Conditions:
+  UseDefaultSecretArns: !Equals [!Join ["", !Ref SecretArnPatterns], ""]
+
+Resources:
+  TrustAnchor:
+    Type: AWS::RolesAnywhere::TrustAnchor
+    Properties:
+      Name: !FindInMap [EnvironmentMap, !Ref Environment, Name]
+      Enabled: true
+      Source:
+        SourceType: CERTIFICATE_BUNDLE
+        SourceData:
+          X509CertificateData: !Ref CaCertificate
+
+  # external-secrets コントローラーのサイドカー（aws_signing_helper）が引き受けるロール
+  ExternalSecretsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !FindInMap [EnvironmentMap, !Ref Environment, ExternalSecretsRoleName]
+      Description: !Sub Assumed by the external-secrets controller sidecar on the ${Environment} cluster via IAM Roles Anywhere
+      MaxSessionDuration: 3600
+      # どの環境用のロールかをタグで示す（IAM コンソールのロール一覧やタグでの検索で分かるように）
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: kappaas
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rolesanywhere.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+              - sts:SetSourceIdentity
+            Condition:
+              # この環境のトラストアンカー（この環境の CA）で検証された、CN=external-secrets の証明書だけ
+              # （CN は charts/external-secrets/templates/aws-certificate.yaml の commonName と合わせる）
+              ArnEquals:
+                aws:SourceArn: !GetAtt TrustAnchor.TrustAnchorArn
+              StringEquals:
+                aws:PrincipalTag/x509Subject/CN: external-secrets
+      Policies:
+        - PolicyName: ReadSecrets
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # external-secrets が必要とする 4 操作（ESO のドキュメントの AWS access と同じ）
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetResourcePolicy
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                  - secretsmanager:ListSecretVersionIds
+                Resource: !If
+                  - UseDefaultSecretArns
+                  - !FindInMap [EnvironmentMap, !Ref Environment, SecretArns]
+                  - !Ref SecretArnPatterns
+
+  # kakeibon-backend のサイドカー（aws_signing_helper）が引き受けるロール
+  # 権限は docs/iam-roles-anywhere.md の「KakeibonBackendRole の権限ポリシー」（S3 は使っていない user バケットを外した）
+  KakeibonBackendRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !FindInMap [EnvironmentMap, !Ref Environment, KakeibonBackendRoleName]
+      Description: !Sub Assumed by the kakeibon-backend sidecar on the ${Environment} cluster via IAM Roles Anywhere
+      MaxSessionDuration: 3600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: kappaas
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: rolesanywhere.amazonaws.com
+            Action:
+              - sts:AssumeRole
+              - sts:TagSession
+              - sts:SetSourceIdentity
+            Condition:
+              # この環境のトラストアンカーで検証された、CN=kakeibon-backend の証明書だけ
+              # （CN は kakeibon-backend の Certificate の commonName と合わせる。iam-roles-anywhere.md の段階 2）
+              ArnEquals:
+                aws:SourceArn: !GetAtt TrustAnchor.TrustAnchorArn
+              StringEquals:
+                aws:PrincipalTag/x509Subject/CN: kakeibon-backend
+      Policies:
+        - PolicyName: KakeibonBackend
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: DynamoDB
+                Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Scan
+                  - dynamodb:Query
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:DescribeTable
+                  - dynamodb:BatchGetItem
+                Resource:
+                  - !FindInMap [EnvironmentMap, !Ref Environment, KakeibonTableArn]
+                  # GSI（GSI1・GSI2）への Query
+                  - !Sub
+                    - ${TableArn}/*
+                    - TableArn: !FindInMap [EnvironmentMap, !Ref Environment, KakeibonTableArn]
+              - Sid: S3Bucket
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !FindInMap [EnvironmentMap, !Ref Environment, KakeibonBucketArns]
+              - Sid: S3Object
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource: !FindInMap [EnvironmentMap, !Ref Environment, KakeibonObjectArns]
+              - Sid: SES
+                Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                # SES の ID はドメイン単位（スタック kakeibon-ses）。両環境で共用
+                Resource: arn:aws:ses:ap-northeast-1:391726422976:identity/kawashima-kazuh.com
+                Condition:
+                  StringEquals:
+                    ses:FromAddress: noreply@kawashima-kazuh.com
+
+  Profile:
+    Type: AWS::RolesAnywhere::Profile
+    Properties:
+      Name: !FindInMap [EnvironmentMap, !Ref Environment, Name]
+      Enabled: true
+      RoleArns:
+        - !GetAtt ExternalSecretsRole.Arn
+        - !GetAtt KakeibonBackendRole.Arn
+
+Outputs:
+  # charts/external-secrets/<env>/values.yaml の aws.* に書く
+  TrustAnchorArn:
+    Value: !GetAtt TrustAnchor.TrustAnchorArn
+  ProfileArn:
+    Value: !GetAtt Profile.ProfileArn
+  ExternalSecretsRoleArn:
+    Value: !GetAtt ExternalSecretsRole.Arn
+  # kakeibon-backend のサイドカーに渡す（iam-roles-anywhere.md の段階 2）
+  KakeibonBackendRoleArn:
+    Value: !GetAtt KakeibonBackendRole.Arn

@@ -1,0 +1,19 @@
+# 開発クラスタ（altair）用。argocd-config/applications/overlays/dev の app-kakeibon が dev ブランチから同期する
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+  # kakeibon-backend のサイドカー用（本番に入れるときに base へ移す）
+  - aws-certificate.yaml
+  - aws-config.yaml
+  # https://kakeibon-dev.local のサーバー証明書
+  - kakeibon-client-tls.yaml
+
+# patches/<base のパス>-patch.yaml
+patches:
+  - path: patches/backend/configmap-patch.yaml
+  - path: patches/backend/deployment-patch.yaml
+  - path: patches/client/deployment-patch.yaml
+  - path: patches/client/httpproxy-patch.yaml
+  - path: patches/external-secrets-patch.yaml

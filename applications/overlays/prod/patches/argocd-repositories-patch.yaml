@@ -1,0 +1,10 @@
+# release ブランチを同期し、Argo CD の設定も prod の overlay を使う
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-repositories
+  namespace: argocd
+spec:
+  source:
+    targetRevision: release
+    path: argocd-config/repositories/overlays/prod

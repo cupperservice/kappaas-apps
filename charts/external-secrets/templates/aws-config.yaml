@@ -1,0 +1,12 @@
+# サイドカー（aws_signing_helper）に渡す IAM Roles Anywhere の ARN
+# 環境ごとの値は prod/values.yaml・dev/values.yaml の aws.*（aws/rolesanywhere.yaml のスタックの Outputs）
+# ARN をここに直接書かないこと（環境ごとに違う。直接書くと本番でも開発のロールを使ってしまう）
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: external-secrets-aws
+  namespace: {{ .Release.Namespace }}
+data:
+  TRUST_ANCHOR_ARN: {{ required "aws.trustAnchorArn が必要です" .Values.aws.trustAnchorArn | quote }}
+  PROFILE_ARN: {{ required "aws.profileArn が必要です" .Values.aws.profileArn | quote }}
+  ROLE_ARN: {{ required "aws.roleArn が必要です" .Values.aws.roleArn | quote }}

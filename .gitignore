@@ -1,0 +1,7 @@
+bootstrap/argocd-repo-secret.yaml
+bootstrap/argocd-dex-secret.yaml
+credentials.json
+*.key
+*.crt
+secrets.yaml
+bootstrap/argocd-dex-secret-dev.yaml

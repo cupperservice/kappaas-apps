@@ -1,0 +1,10 @@
+# dev ブランチを同期し、Argo CD の設定も dev の overlay を使う
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argocd-applications
+  namespace: argocd
+spec:
+  source:
+    targetRevision: dev
+    path: argocd-config/applications/overlays/dev
