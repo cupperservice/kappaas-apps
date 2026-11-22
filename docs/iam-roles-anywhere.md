@@ -12,6 +12,7 @@
 | 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（**開発は実施済み**: `services/kakeibon/overlays/dev` の `aws-certificate.yaml`・`aws-config.yaml`・`patches/backend/deployment-patch.yaml`。本番は本番の rolesanywhere スタック作成後に base へ移す）。マニフェストは kakeibon-apps から `services/kakeibon` に移した（[kakeibon.md](kakeibon.md)）。下の文中の kakeibon-apps の `components/backend/...` は `services/kakeibon/base/backend/...` と読み替える |
 | 共用の aws-credential-helper | 開発: 段階 1 で廃止（`applications/overlays/dev/patches/aws-credential-helper-patch.yaml` で除外）。本番: kakeibon-backend が使うので段階 2 まで残す（KppaasRole のまま） |
 | 開発の kakeibon-backend | サイドカーで `KakeibonBackendDevRole` を使う（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、SES は共用。docs/kakeibon-dev-aws.md） |
+| 本番テーブル | 本番は 2026-11-19 に `kakeibon-dev` から `kakeibon-prod` に移した（[kakeibon-dev-aws.md](kakeibon-dev-aws.md) の手順 1）。下の文中の本番の `kakeibon-dev` は `kakeibon-prod` と読み替える（aws/rolesanywhere.yaml の KakeibonBackendRole は kakeibon-prod を指す） |
 
 ### 段階 1 の手順（external-secrets）
 
@@ -105,7 +106,8 @@ kakeibon-backend の Pod（kakeibon-apps リポジトリ）
 - kakeibon-backend の AWS 利用（`kakeibon/backend/src/services/{dynamo,s3,ses}.ts`、ConfigMap `kakeibon-backend-config`）
   - DynamoDB テーブル `kakeibon-dev`（インデックスあり）: Get / Put / Delete / Query / Scan / BatchGet / BatchWrite / TransactWrite
     - TransactWrite は Put / Delete だけで構成され、ConditionCheck や Update は使っていない
-  - S3 バケット `kakeibo-data-bucket`、`kakeibo-user-bucket`: GetObject / PutObject / DeleteObject / DeleteObjects、署名付き URL
+  - S3 バケット `kakeibo-data-bucket`: GetObject / PutObject / DeleteObject / DeleteObjects、署名付き URL
+    - `kakeibo-user-bucket` は使っていない（2026-11-17 確認）。KakeibonBackendRole（aws/rolesanywhere.yaml）には権限を付けない。下の権限ポリシーの例に残っている user バケットの行は、今の KppaasRole の内容
   - SES: `SendEmail`（送信元 `noreply@kawashima-kazuh.com`）
   - Secrets Manager は直接使っていない（JWT は ExternalSecret 経由）
 - kakeibon-backend の Deployment には、どのコンテナにもマウントされていない volume `certs`（Secret `kakeibon-backend-secrets`、クラスタに存在しない）と `bin` が残っている。以前サイドカーを試したときの名残と思われる。今回のサイドカーで置き換える
@@ -607,7 +609,7 @@ aws iam delete-role --role-name KppaasRole
 
 ## 未確認事項
 
-- [ ] SES の ID がドメイン単位（`kawashima-kazuh.com`）かアドレス単位（`noreply@kawashima-kazuh.com`）か → KakeibonBackendRole の SES の Resource を決める
+- [x] SES の ID がドメイン単位（`kawashima-kazuh.com`）かアドレス単位（`noreply@kawashima-kazuh.com`）か → **ドメイン単位**（2026-11-16 確認。スタック `kakeibon-ses`）。KakeibonBackendRole の SES の Resource は `identity/kawashima-kazuh.com` のまま
 - [ ] Roles Anywhere プロファイルに `managedPolicyArns` / `sessionPolicy` が設定されていないか（設定されていれば、新ロールの権限がそれで削られないか）
 
 ---
