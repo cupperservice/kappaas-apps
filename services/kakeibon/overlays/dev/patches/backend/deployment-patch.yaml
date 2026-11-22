@@ -1,4 +1,8 @@
 # 開発は altair 1 台なので 1 つで十分（本番は base の 2 のまま）
+# AWS の資格情報は Pod 内のサイドカー（aws_signing_helper serve、127.0.0.1:9911）から取る（docs/iam-roles-anywhere.md 段階 2）
+#   開発には共用の aws-credential-helper が無い。本番は当面 base のまま（共用 helper・KppaasRole）
+#   サイドカーの定義は charts/external-secrets/values.yaml の external-secrets のものと同じ
+# Deployment は標準リソースなので、initContainers・containers・env・volumes は name で base とマージされる
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,3 +10,69 @@ metadata:
   namespace: kakeibon
 spec:
   replicas: 1
+  template:
+    spec:
+      initContainers:
+        # aws_signing_helper を取得する
+        - name: download-helper
+          image: alpine:3.20
+          command:
+            - sh
+            - -c
+            - |
+              wget -qO /opt/bin/aws_signing_helper \
+                https://rolesanywhere.amazonaws.com/releases/1.8.2/X86_64/Linux/Amzn2023/aws_signing_helper && \
+              chmod +x /opt/bin/aws_signing_helper
+          volumeMounts:
+            - name: bin
+              mountPath: /opt/bin
+        # ネイティブサイドカー（restartPolicy: Always）。startupProbe が通るまで backend は起動しない
+        - name: aws-credential-helper
+          image: amazonlinux:2023
+          restartPolicy: Always
+          # ARN は ConfigMap（aws-config.yaml）から環境変数で受け取る
+          envFrom:
+            - configMapRef:
+                name: kakeibon-backend-aws
+          command:
+            - sh
+            - -c
+            - |
+              exec /opt/bin/aws_signing_helper serve \
+                --certificate /certs/tls.crt \
+                --private-key /certs/tls.key \
+                --trust-anchor-arn "$TRUST_ANCHOR_ARN" \
+                --profile-arn "$PROFILE_ARN" \
+                --role-arn "$ROLE_ARN" \
+                --port 9911
+          # helper は 127.0.0.1 だけで待ち受けるので、Pod IP に接続する tcpSocket probe は使えない。Pod 内から確認する
+          startupProbe:
+            exec:
+              command: ["bash", "-c", "</dev/tcp/127.0.0.1/9911"]
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+              readOnly: true
+            - name: bin
+              mountPath: /opt/bin
+      containers:
+        - name: backend
+          env:
+            # 接続先を共用 helper の Service から Pod 内のサイドカーに変える
+            - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
+              value: "http://127.0.0.1:9911"
+      volumes:
+        # base に残っている使われていない certs（Secret kakeibon-backend-secrets、存在しない）を置き換える
+        - name: certs
+          secret:
+            secretName: kakeibon-backend-aws-cert
+        - name: bin
+          emptyDir: {}
