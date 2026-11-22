@@ -35,14 +35,14 @@ services/kakeibon/
   - backend の `/readyz` は DynamoDB への疎通を確認し、client の `/readyz` は backend の `/health` を呼ぶ。AWS の認証が無いと両方 Ready にならない
 - Argo CD の Application は `argocd-config/applications/base/kakeibon-apps.yaml`（`app-kakeibon`）。path と targetRevision は `argocd-config/applications/overlays/<env>/patches/kakeibon-apps-patch.yaml`
 
-## 本番の切り替え（未実施）
+## 本番の切り替え（2026-11-23 完了）
 
-本番が `services/kakeibon` を同期するのは、本番の root-app を `release` に切り替えたとき（[prod-cluster.md](prod-cluster.md)「base / overlays 構成・release ブランチへの移行」）。
-**それまで本番は kakeibon-apps リポジトリの `main`（`components`）を同期し続ける**。
+本番も 2026-11-23 から `services/kakeibon/overlays/prod`（release ブランチ）を同期している（[prod-cluster.md](prod-cluster.md)「base / overlays 構成・release ブランチへの移行」の段階 B、#21）。
+それまでは kakeibon-apps リポジトリの `main`（`components`）を同期していた。
 
-- 切り替えの前後で本番のマニフェストは変わらない（`services/kakeibon/overlays/prod` の描画結果が kakeibon-apps の `components` と同じことを 2026-11-21 に確認済み）。Argo CD はリソースを作り直さない
-- 切り替えまでに本番を更新する場合（イメージタグなど）は、kakeibon-apps の `main` と `services/kakeibon/base` の両方を変更する（片方だけだと、切り替えたときに古いものに戻る）
-- 切り替え後、kakeibon-apps のリポジトリ認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）は不要になる。kakeibon-apps リポジトリ自体は残す
+- 切り替えの前後で本番のマニフェストは変わっていない（`services/kakeibon/overlays/prod` の描画結果が kakeibon-apps main（e5d4188）の `components` と完全に一致することを確認してから切り替えた）。kakeibon の Pod は作り直されなかった
+- **kakeibon-apps リポジトリはもう本番・開発のどちらからも参照されない。** イメージタグなどの変更は `services/kakeibon` だけで行う（kakeibon-apps を変更しても反映されない）
+- kakeibon-apps のリポジトリ認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）は不要になった。削除は prod-cluster.md の段階 C で行う。kakeibon-apps リポジトリ自体は残す
 
 ## イメージを更新する
 
