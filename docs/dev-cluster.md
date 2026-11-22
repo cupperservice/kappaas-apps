@@ -356,6 +356,7 @@ kubectl --context dev -n argocd get app -o custom-columns=NAME:.metadata.name,RE
 |---|---|
 | `ERR_ADDRESS_UNREACHABLE`。Edge では開けるのに Chrome だけ開けない、など | macOS の「ローカルネットワーク」の許可。「システム設定」→「プライバシーとセキュリティ」→「ローカルネットワーク」に同じアプリ（Google Chrome など）が複数並ぶことがある（補助プログラムや更新のたびに項目が増えるため）。**全部オン**にして ⌘Q で終了 → 起動。それでも駄目なら **Mac を再起動**（どちらの件も再起動で直った） |
 | `argocd-dev.local` とだけ入力すると開けない | Argo CD は HTTPS（443）だけ。`https://argocd-dev.local/` と入力する |
+| Argo CD で「保護されていない接続」 | Mac が開発の k8s-ca を信頼していない。[argocd-self-managed.md](argocd-self-managed.md)「サーバー証明書」の手順で信頼する。issuer が `O=Argo CD` のままなら、`argocd` アプリを Sync していない（Certificate `argocd-server` が無い） |
 | `kakeibon-dev.local` が開けない | kakeibon は HTTP（80）だけ。`http://kakeibon-dev.local/` と入力する。Chrome の「常に安全な接続を使用する」がオンだと HTTPS に切り替わることがある |
 | 名前解決に約 5 秒かかる | `.local` は macOS では mDNS（Bonjour）扱いで、IPv6 を探してから `/etc/hosts` の IPv4 を使うため。初回だけで、正常 |
 | `host argocd-dev.local` が NXDOMAIN | `host` は `/etc/hosts` を見ない。`dscacheutil -q host -a name argocd-dev.local` で確認する |
