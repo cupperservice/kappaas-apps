@@ -1,2 +1,11 @@
-# 開発クラスタ（altair）用（values.yaml に重ねる）。現在は開発固有の値なし
-{}
+# 開発クラスタ（altair）用（values.yaml に重ねる）
+# 開発はノード 1 台なので、レプリカを 2 つにしても冗長化にならない → 1 つにする
+# replicas 1 で PDB（minAvailable 1）を残すと ALLOWED DISRUPTIONS が 0 になり drain が止まるので、PDB も作らない
+cert-manager:
+  replicaCount: 1
+  podDisruptionBudget:
+    enabled: false
+  webhook:
+    replicaCount: 1
+    podDisruptionBudget:
+      enabled: false

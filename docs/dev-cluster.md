@@ -16,6 +16,14 @@
 | AWS | IAM Roles Anywhere（本番の CA・KppaasRole） | IAM Roles Anywhere（dev の CA・dev 用ロール） |
 
 - 開発クラスタは本番と完全に別のクラスタ（etcd・CA・Argo CD すべて別）。開発で壊しても本番に影響しない
+- **開発はノード 1 台なので、replicas は 1・PDB は作らない**（2 つにしても冗長化にならない。replicas 1 で PDB の minAvailable 1 を残すと drain が止まる）
+  - Argo CD で管理しているもの: `charts/<chart>/dev/values.yaml`（cert-manager・external-secrets）と `services/kakeibon/overlays/dev/patches/*/deployment-patch.yaml`（kakeibon）で 1 にしている。chart を追加したら dev の values でも 1 にする
+  - coredns は kubeadm が作るもので Argo CD の管理外。手で 1 にする（kubeadm でアップグレードした後にも確認する）
+
+    ```bash
+    kubectl --context dev -n kube-system scale deploy coredns --replicas=1
+    kubectl --context dev get deploy,sts -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,REPLICAS:.spec.replicas | awk 'NR==1 || $3>=2'   # 見出しだけになること
+    ```
 - 実行場所の表記: **[Mac]** = kubectl / helm を使う端末、**[altair]** = altair に SSH
 
 ## 運用フロー
