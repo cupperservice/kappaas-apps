@@ -320,9 +320,10 @@ CN=`external-secrets` の証明書で `KappaasDevExternalSecretsRole` を引き�
 `app-kakeibon` が dev ブランチの `services/kakeibon/overlays/dev` を同期する（[kakeibon.md](kakeibon.md)）。
 
 - [x] 開発用の差分（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、JWT `kakeibon-dev/jwt-secret`、ホスト名 `kakeibon-dev.local`）を `services/kakeibon/overlays/dev` に用意
-- [ ] 開発用の AWS リソース（バケット・JWT・IAM ロール）を作る（kakeibon-dev-aws.md の手順 2・3）
-- [ ] kakeibon-backend の AWS 資格情報（iam-roles-anywhere.md の段階 2。サイドカーと KakeibonBackendDevRole）
-- [ ] **[Mac]** `/etc/hosts` に `192.168.3.121 kakeibon-dev.local`
+- [x] 開発用の AWS リソース（バケット・JWT・IAM ロール）を作る（[kakeibon-dev-aws.md](kakeibon-dev-aws.md) の手順 2・3）
+- [x] kakeibon-backend の AWS 資格情報（iam-roles-anywhere.md の段階 2。サイドカーと KakeibonBackendDevRole）
+- [x] **[Mac]** `/etc/hosts` に `192.168.3.121 kakeibon-dev.local`
+- [x] http://kakeibon-dev.local で開ける（2026-11-22。HTTPS ではなく HTTP）
 
 ---
 
@@ -338,6 +339,19 @@ kubectl --context dev -n argocd get app -o custom-columns=NAME:.metadata.name,RE
 
 - [ ] https://argocd-dev.local に GitHub でログインできる
 - [ ] dev ブランチに軽微な変更を push → 開発だけに反映され、本番（https://argocd.local）には反映されない
+
+## ブラウザから開けないとき
+
+`curl` では開けるのにブラウザでは開けない場合は、ブラウザ側の問題であることが多い（2026-11 に argocd-dev.local・kakeibon-dev.local で発生）。
+
+| 症状 | 原因と対処 |
+|---|---|
+| `ERR_ADDRESS_UNREACHABLE`。Edge では開けるのに Chrome だけ開けない、など | macOS の「ローカルネットワーク」の許可。「システム設定」→「プライバシーとセキュリティ」→「ローカルネットワーク」に同じアプリ（Google Chrome など）が複数並ぶことがある（補助プログラムや更新のたびに項目が増えるため）。**全部オン**にして ⌘Q で終了 → 起動。それでも駄目なら **Mac を再起動**（どちらの件も再起動で直った） |
+| `argocd-dev.local` とだけ入力すると開けない | Argo CD は HTTPS（443）だけ。`https://argocd-dev.local/` と入力する |
+| `kakeibon-dev.local` が開けない | kakeibon は HTTP（80）だけ。`http://kakeibon-dev.local/` と入力する。Chrome の「常に安全な接続を使用する」がオンだと HTTPS に切り替わることがある |
+| 名前解決に約 5 秒かかる | `.local` は macOS では mDNS（Bonjour）扱いで、IPv6 を探してから `/etc/hosts` の IPv4 を使うため。初回だけで、正常 |
+| `host argocd-dev.local` が NXDOMAIN | `host` は `/etc/hosts` を見ない。`dscacheutil -q host -a name argocd-dev.local` で確認する |
+| 古い失敗が残っている | Chrome の `chrome://net-internals/#dns` で Clear host cache、`#sockets` で Flush socket pools |
 
 ## 作り直す / 本番に戻す
 

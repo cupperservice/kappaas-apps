@@ -195,9 +195,63 @@ sudo journalctl -k -b -1 --no-pager | grep -i -E 'oom|out of memory|hung task|so
 sudo journalctl -b -1 -u kubelet --no-pager | grep -i -E 'evict|pressure' | tail -30
 ```
 
-- [ ] 原因: （記入）
+- [ ] 原因: （記入）。2026-11-17 の capella と同じ症状だった可能性がある（下の「SMC による CPU の強制減速」）
 
 ---
+
+## SMC による CPU の強制減速（2026-11-17 capella）
+
+### 症状
+
+- ノードが NotReady（kubelet が `Kubelet stopped posting node status`）。ping・SSH は通る
+- load average が 40〜60 台（4 コア）。メモリには余裕がある
+- そのノードの kube-apiserver が再起動を繰り返す（自分自身への接続が `TLS handshake timeout` になり、`PostStartHook "rbac/bootstrap-roles" failed` で終了）
+  - kubelet は自ノードの apiserver（`192.168.3.12x:6443`）に接続するので、状態を報告できなくなる
+- etcd の `endpoint health` でそのノードだけ応答が秒単位に遅い
+- そのノードにあった Pod は他のノードに移り、元の Pod は Terminating のまま残る（サービスは継続）
+
+### 原因
+
+本体の管理チップ（SMC）が温度センサーの異常値（CPU 100℃、チップセット 116℃）を報告し、ファンを最大にして CPU を約 220 MHz まで絞った。
+CPU 自身のセンサーは 29℃ で、実際には熱くなっていなかった。停止 → 電源を抜いて SMC をリセット → 起動で正常に戻った（周波数 3 GHz 台、SMC の温度 40℃ 前後）。
+センサー・SMC の一時的な誤動作と考えられるが、ほこりなどで実際に熱がこもっていた可能性も残る。
+
+### 見分け方（そのノードで実行）
+
+```bash
+# CPU の周波数。正常なら 800〜3,500 MHz。数百 MHz なら強制減速されている
+grep MHz /proc/cpuinfo
+
+# SMC が報告する温度とファン。TC0F・TC0E・TCXC（CPU）、TPCD（チップセット）が 100℃ 前後、ファンが最大（約 4,900 rpm）なら異常
+d=/sys/devices/platform/applesmc.768
+cat $d/fan1_input
+for t in $d/temp*_input; do l=$(cat ${t%_input}_label); case $l in TC0F|TC0E|TCXC|TPCD|TC0P|TC0C) echo "$l $(( $(cat $t)/1000 ))";; esac; done
+
+# 性能を制限している理由。「Active: ThermStatus」が出ていれば熱による制限（正常時は Auto-HWP や MultiCoreTurbo だけ）
+sudo turbostat --debug --num_iterations 1 --interval 1 2>&1 | grep CORE_PERF_LIMIT
+```
+
+- 正常なノードと比べると分かりやすい（周波数・SMC の温度・ファンの回転数）
+- CPU 自身のセンサー（TC0P・TC0C）が低いのに SMC の値だけ高い場合は、センサー・SMC の異常
+
+### 対処
+
+1. **[Mac]** サービスが他のノードで動いていることを確認（`kubectl --context prod get pods -A -o wide | grep -v Running`、kakeibon の外部 URL）
+2. **[node]** 停止する: `sudo poweroff`（停止中は etcd が 2 台になり、もう 1 台止まるとクラスタ全体が止まる）
+3. **[本体]** SMC をリセットする: 電源ケーブルを抜いて 15 秒待つ → 差し直して 5 秒待つ → 電源ボタン。吸排気口のほこりも確認する
+4. **[node] [Mac]** 起動後に確認
+   - 周波数が 3 GHz 前後、SMC の温度が 40〜50℃、ファンが最低（約 1,800 rpm）
+   - `kubectl --context prod get nodes` で Ready、unreachable の taint が消えている
+   - etcd が 3 メンバーとも healthy、Terminating の Pod が消えている
+
+### 再発したら
+
+センサー・SMC・冷却（チップセットのヒートシンクなど）のハードウェア故障を疑う。修理するまでそのノードを本番から外す。
+外している間の etcd は 2 台（耐障害性 0）になるので、必要なら altair を本番に入れる（上の「CP が故障したとき」）。
+
+| 日付 | ノード | 対処 | 備考 |
+| ---- | ------ | ---- | ---- |
+| 2026-11-17 | capella | 停止 → SMC リセット → 起動 | NotReady は 05:31〜20:42 UTC 頃。サービス停止なし |
 
 ---
 
