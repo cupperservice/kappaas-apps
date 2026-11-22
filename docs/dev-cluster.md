@@ -70,14 +70,14 @@ feature ブランチ → dev（altair の Argo CD が同期して確認）→ ma
   ├── Chart.yaml
   ├── values.yaml        prod / dev 共通の値
   ├── prod/values.yaml   本番の値
-  └── dev/values.yaml    開発の値（cloudflare-tunnel・aws-credential-helper は開発に入れないので無し）
+  └── dev/values.yaml    開発の値（cloudflare-tunnel は開発に入れないので無し）
   ```
 
   - patch は base のファイルごとに 1 つ、`overlays/<env>/patches/<base のファイル名>-patch.yaml` に置く
   - patch は strategic merge 形式（Application のマニフェストの一部を書く）。`metadata.name` で対象が決まるので kustomization.yaml に target は書かない
   - リスト（`valueFiles`、`sources`）は丸ごと置き換わるので、patch には全要素を書く（例: `valueFiles: [values.yaml, dev/values.yaml]`）
   - Application は base で `values.yaml` を指定し、patch で `prod/values.yaml` / `dev/values.yaml` を後ろに追加する（後ろが優先）
-  - 現在、環境で値が違うのは argocd（URL・dex）、external-secrets（サイドカーが使う IAM Roles Anywhere の ARN）、aws-credential-helper（本番のみ。kakeibon-backend 用）、cloudflare-tunnel（本番のみ）
+  - 現在、環境で値が違うのは argocd（URL・dex）、external-secrets（サイドカーが使う IAM Roles Anywhere の ARN）、cloudflare-tunnel（本番のみ）。共用の aws-credential-helper は 2026-11-23 に廃止した
   - base に Application を追加したら、prod・dev の両方に patch を作って kustomization.yaml に追加する
   - 開発用の bootstrap は `bootstrap/*-dev.yaml`
 - **Argo CD 自身（`argocd` アプリ）は手動 Sync**（[argocd-self-managed.md](argocd-self-managed.md)）。本番より先に開発で Sync して確認する

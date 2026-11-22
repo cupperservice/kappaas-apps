@@ -43,7 +43,7 @@ services/kakeibon/
 
 - 切り替えの前後で本番のマニフェストは変わっていない（`services/kakeibon/overlays/prod` の描画結果が kakeibon-apps main（e5d4188）の `components` と完全に一致することを確認してから切り替えた）。kakeibon の Pod は作り直されなかった
 - **kakeibon-apps リポジトリはもう本番・開発のどちらからも参照されない。** イメージタグなどの変更は `services/kakeibon` だけで行う（kakeibon-apps を変更しても反映されない）
-- kakeibon-apps のリポジトリ認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）は不要になった。削除は prod-cluster.md の段階 C で行う。kakeibon-apps リポジトリ自体は残す
+- kakeibon-apps のリポジトリ認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）は削除した（prod-cluster.md の段階 C-5）。kakeibon-apps リポジトリ自体は残す
 
 ## イメージを更新する
 
