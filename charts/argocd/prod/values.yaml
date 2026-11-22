@@ -12,3 +12,7 @@ argo-cd:
               clientID: Ov23li3cq07Nri2Q1XoI
               clientSecret: $dex.github.clientSecret
               redirectURI: https://argocd.local/api/dex/callback
+  # サーバー証明書のホスト名（values.yaml の server.certificate）
+  server:
+    certificate:
+      domain: argocd.local

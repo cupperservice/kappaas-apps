@@ -46,6 +46,34 @@ Helm のリリース情報（`secret/sh.helm.release.v1.argocd.v1`）は消さ�
 
 ---
 
+## サーバー証明書（ブラウザの「保護されていない接続」）
+
+argocd-server のサーバー証明書は、cert-manager がクラスタの CA（ClusterIssuer `k8s-ca`、CN `k8s-on-prem-ca`）で発行する（2026-11-22 から）。
+
+- 設定は `charts/argocd/values.yaml` の `argo-cd.server.certificate`（issuer・有効期間 90 日・15 日前に更新）と、環境ごとのホスト名（`prod/values.yaml`: `argocd.local`、`dev/values.yaml`: `argocd-dev.local`）
+- Certificate `argocd-server` が Secret `argocd-server-tls` を作り、argocd-server は自動でそれを使う（再起動不要。更新も自動）
+- それまでは argocd-server が自動で作る自己署名証明書（`O=Argo CD`、ホスト名が入っていない）だったので、ブラウザで警告が出ていた
+- HTTPProxy は TLS パススルーなので、この証明書がそのままブラウザに届く
+
+### Mac で k8s-ca を信頼する（1 回だけ）
+
+ブラウザの警告を消すには、Mac で各クラスタの k8s-ca を信頼する。Chrome・Edge・Safari は macOS のキーチェーンを使う（Firefox は独自の証明書ストアなので別に設定する）。
+
+```bash
+# [Mac] 開発（本番は --context prod・prod-ca.crt に読み替える）
+kubectl --context dev get secret k8s-ca-secret -n cert-manager -o jsonpath='{.data.tls\.crt}' | base64 -d > ~/k8s-backup/dev-ca.crt
+openssl x509 -in ~/k8s-backup/dev-ca.crt -noout -subject -enddate        # CN = k8s-on-prem-ca
+sudo security add-trusted-cert -d -r trustRoot -p ssl -k /Library/Keychains/System.keychain ~/k8s-backup/dev-ca.crt
+```
+
+- `-p ssl` で、TLS のサーバー証明書の検証にだけ信頼する
+- 確認: `echo | openssl s_client -connect 192.168.3.121:443 -servername argocd-dev.local 2>/dev/null | openssl x509 -noout -issuer -ext subjectAltName`（issuer が `CN=k8s-on-prem-ca`、SAN に `argocd-dev.local`）。ブラウザは一度終了（⌘Q）してから開き直す
+- **注意**: k8s-ca は IAM Roles Anywhere のトラストアンカーでもある。Mac で信頼すると、そのクラスタで Certificate を作れる人は、Mac が信頼する任意のホスト名の証明書を発行できるようになる。クラスタの管理者権限を持つのが自分だけであることが前提
+- 両クラスタの CA は同じ CN（`k8s-on-prem-ca`）なので、キーチェーンアクセスでは有効期限などで見分ける
+- クラスタを作り直して CA が変わったら、キーチェーンアクセスで古い CA を削除してから入れ直す
+
+---
+
 ## 更新（Dependabot の PR）
 
 1. PR の差分（argo-cd チャートのバージョン）と、リリースノートを確認する
