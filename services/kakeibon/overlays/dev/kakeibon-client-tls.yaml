@@ -1,0 +1,24 @@
+# 開発の kakeibon（https://kakeibon-dev.local）のサーバー証明書。Contour が TLS を終端する（patches/client/httpproxy-patch.yaml）
+# クラスタの CA（k8s-ca）で発行するので、Mac で開発の k8s-ca を信頼していれば警告は出ない（docs/argocd-self-managed.md「サーバー証明書」）
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: kakeibon-client-tls
+  namespace: kakeibon
+spec:
+  commonName: kakeibon-dev.local
+  dnsNames:
+    - kakeibon-dev.local
+  secretName: kakeibon-client-tls
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  issuerRef:
+    name: k8s-ca
+    kind: ClusterIssuer

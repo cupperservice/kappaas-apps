@@ -25,7 +25,7 @@ services/kakeibon/
 | DynamoDB | `kakeibon-prod` | `kakeibon-dev` |
 | S3 | `kakeibo-data-bucket`（`S3_USER_BUCKET_NAME` も設定。使っていない） | `kakeibo-data-bucket-dev` |
 | JWT（Secrets Manager） | `kakeibon/jwt-secret` | `kakeibon-dev/jwt-secret` |
-| LAN 内のホスト名 | `kakeibon.local`（192.168.3.120） | `kakeibon-dev.local`（192.168.3.121） |
+| LAN 内のホスト名 | `http://kakeibon.local`（192.168.3.120） | `https://kakeibon-dev.local`（192.168.3.121。HTTP は HTTPS にリダイレクト。証明書は k8s-ca で発行した `overlays/dev/kakeibon-client-tls.yaml`） |
 | 外部公開 | Cloudflare Tunnel（kakeibon.kappa-as.com） | なし |
 | 同期するブランチ（app-kakeibon） | `release` の `overlays/prod` | `dev` の `overlays/dev` |
 

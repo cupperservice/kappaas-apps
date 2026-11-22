@@ -7,6 +7,8 @@ resources:
   # kakeibon-backend のサイドカー用（本番に入れるときに base へ移す）
   - aws-certificate.yaml
   - aws-config.yaml
+  # https://kakeibon-dev.local のサーバー証明書
+  - kakeibon-client-tls.yaml
 
 # patches/<base のパス>-patch.yaml
 patches:
