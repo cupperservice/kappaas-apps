@@ -11,7 +11,6 @@ patches:
   - path: patches/argocd-applications-patch.yaml
   - path: patches/argocd-patch.yaml
   - path: patches/argocd-repositories-patch.yaml
-  - path: patches/aws-credential-helper-patch.yaml
   - path: patches/cert-manager-patch.yaml
   - path: patches/cloudflare-tunnel-patch.yaml
   - path: patches/csi-driver-smb-patch.yaml
