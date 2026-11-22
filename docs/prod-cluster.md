@@ -106,19 +106,34 @@ root-app が環境ごとの値の無い base を同期し、aws-credential-helpe
 戻し方（段階 B の後に問題が出た場合）: main → release のマージを revert する PR を release に入れると、本番は fcbccc1 の状態に戻る。
 external-secrets で問題が出ても、作成済みの Secret は残るので kakeibon はすぐには止まらない。
 
-### 段階 C: kakeibon-backend のサイドカーと共用 helper の廃止（未実施）
+### 段階 C: kakeibon-backend のサイドカーと共用 helper の廃止（C-1〜C-3・C-5 は 2026-11-23、C-4 は未実施）
 
 [iam-roles-anywhere.md](iam-roles-anywhere.md) の段階 2 の本番分とステップ 4・5。
 
-1. `services/kakeibon/overlays/dev` にあるサイドカー一式（`aws-certificate.yaml`・`aws-config.yaml`・`patches/backend/deployment-patch.yaml` のサイドカー部分）を base に移し、ARN だけを環境ごとにする（本番は `KakeibonBackendRole`、kakeibon-prod）
-2. dev → main → release で本番に反映し、kakeibon（DynamoDB・S3・SES）の動作を確認
-3. 本番の共用 aws-credential-helper（DaemonSet）を廃止する。各ノードの 9911 番ポートが LAN から応答しないことを確認
-4. 1 週間ほど様子を見て、KppaasRole と旧トラストアンカー・プロファイルを削除する
-5. kakeibon-apps リポジトリの認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）を削除する
+1. **C-1（#23）**: `services/kakeibon/overlays/dev` にあったサイドカー一式を base に移し、ARN だけを環境ごとにした（`overlays/<env>/patches/backend/aws-config-patch.yaml`。本番は `KakeibonBackendRole`）
+2. **C-2（#24・#25）**: dev → main → release で本番に反映。backend がサイドカー付きの新しい Pod（2/2）に 1 つずつ入れ替わり、`/readyz`（DynamoDB）が 200、ブラウザでログイン・データ・ファイル・メールが動くことを確認
+3. **C-3**: 共用の aws-credential-helper を廃止する（`applications/base/aws-credential-helper.yaml`・`charts/aws-credential-helper/`・Dependabot の docker の設定を削除）
+   - Application に finalizer があるので、Argo CD が DaemonSet・Service・Certificate を削除する。Namespace `aws-credential-helper` は残るので、空になったら手で削除する
+   - 確認: 各ノードの 9911 番ポートが LAN から応答しない（下のコマンド）
+4. **C-4（未実施）**: 1 週間ほど様子を見て、KppaasRole と旧トラストアンカー・プロファイルを削除する（iam-roles-anywhere.md のステップ 5。CloudTrail で KppaasRole が使われていないことを確認してから）
+5. **C-5**: kakeibon-apps リポジトリの認証情報（`argocd-config/repositories/base/kakeibon-apps.yaml`）を削除する
+   - ExternalSecret の creationPolicy が Owner なので、Secret `kakeibon-apps-secret` も一緒に消える
+   - Secrets Manager の `kappaas-apps/repositories/kakeibon-apps/github-personal-access-token` も不要になる（削除は手で。GitHub の PAT も失効させる）
+
+```bash
+# [Mac] C-3 の確認
+kubectl --context prod get ns aws-credential-helper            # 中身が空になったら kubectl delete ns aws-credential-helper
+kubectl --context prod -n aws-credential-helper get all
+for ip in 192.168.3.124 192.168.3.126 192.168.3.127; do
+  curl -s -o /dev/null -w "$ip: %{http_code}\n" --max-time 3 -X PUT http://$ip:9911/latest/api/token \
+    -H 'X-aws-ec2-metadata-token-ttl-seconds: 60'                # 000（応答なし）になること
+done
+```
 
 - [x] 段階 A
 - [x] 段階 B
-- [ ] 段階 C
+- [x] 段階 C の C-1〜C-3・C-5
+- [ ] 段階 C の C-4（KppaasRole と旧トラストアンカー・プロファイルの削除）
 
 ---
 

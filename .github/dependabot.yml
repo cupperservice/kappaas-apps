@@ -1,4 +1,4 @@
-# Dependabot: Helm チャートの依存とコンテナイメージの更新 PR を作る
+# Dependabot: Helm チャートの依存の更新 PR を作る（共用 aws-credential-helper の廃止でコンテナイメージの監視は無くなった）
 # PR は dev ブランチに来る。マージすると開発クラスタ（altair）に反映されるので、そこで確認してから
 # dev → main → release とマージする（release をマージした時点で本番に反映される）。
 # マージ前に必ずリリースノート（特にメジャーバージョン）を確認すること。
@@ -24,17 +24,3 @@ updates:
     commit-message:
       prefix: deps
 
-  - package-ecosystem: docker
-    target-branch: dev
-    directories:
-      - /charts/aws-credential-helper
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:00"
-      timezone: Asia/Tokyo
-    open-pull-requests-limit: 5
-    labels:
-      - dependencies
-    commit-message:
-      prefix: deps
