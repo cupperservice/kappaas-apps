@@ -30,8 +30,9 @@ services/kakeibon/
 | 同期するブランチ（app-kakeibon） | `release` の `overlays/prod` | `dev` の `overlays/dev` |
 
 - 開発用の AWS リソース（テーブル・バケット・JWT・IAM）は [kakeibon-dev-aws.md](kakeibon-dev-aws.md)
-- 開発の kakeibon-backend は、Pod 内のサイドカー（aws_signing_helper）で `KakeibonBackendDevRole` を引き受けて DynamoDB / S3 / SES を使う（[iam-roles-anywhere.md](iam-roles-anywhere.md) の段階 2）
-  - サイドカー・Certificate・ARN の ConfigMap は今は `overlays/dev` だけにある（`aws-certificate.yaml`・`aws-config.yaml`・`patches/backend/deployment-patch.yaml`）。本番は共用 helper（KppaasRole）のまま。本番に入れるときに base へ移す
+- kakeibon-backend は、Pod 内のサイドカー（aws_signing_helper）で IAM ロールを引き受けて DynamoDB / S3 / SES を使う（[iam-roles-anywhere.md](iam-roles-anywhere.md) の段階 2）
+  - サイドカー・Certificate は `base/backend`（`deployment.yaml`・`aws-certificate.yaml`・`aws-config.yaml`）。ARN は環境ごとに `overlays/<env>/patches/backend/aws-config-patch.yaml`（本番 `KakeibonBackendRole`、開発 `KakeibonBackendDevRole`）
+  - 本番は 2026-11 まで共用の aws-credential-helper（KppaasRole）を使っていた（prod-cluster.md の段階 C で切り替え）
   - backend の `/readyz` は DynamoDB への疎通を確認し、client の `/readyz` は backend の `/health` を呼ぶ。AWS の認証が無いと両方 Ready にならない
 - Argo CD の Application は `argocd-config/applications/base/kakeibon-apps.yaml`（`app-kakeibon`）。path と targetRevision は `argocd-config/applications/overlays/<env>/patches/kakeibon-apps-patch.yaml`
 
