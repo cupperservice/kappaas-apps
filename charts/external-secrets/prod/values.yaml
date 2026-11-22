@@ -1,7 +1,6 @@
 # 本番クラスタ用（values.yaml に重ねる）
 # サイドカーが使う IAM Roles Anywhere の ARN（aws/rolesanywhere.yaml のスタック kappaas-prod-rolesanywhere の Outputs）
-# 本番スタックを作るまでは未設定。release にマージする前に必ず埋める（docs/iam-roles-anywhere.md）
 aws:
-  trustAnchorArn: "REPLACE_WITH_PROD_TRUST_ANCHOR_ARN"
-  profileArn: "REPLACE_WITH_PROD_PROFILE_ARN"
+  trustAnchorArn: "arn:aws:rolesanywhere:ap-northeast-1:391726422976:trust-anchor/a0d8433e-b695-4cb7-b190-e2a46ba86ab6"
+  profileArn: "arn:aws:rolesanywhere:ap-northeast-1:391726422976:profile/76d3d14c-3877-4ce6-8a20-0435b70be2ca"
   roleArn: "arn:aws:iam::391726422976:role/KappaasExternalSecretsRole"
