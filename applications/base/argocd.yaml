@@ -21,7 +21,7 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
-  # Argo CD 自身なので自動同期にしない（Diff を確認してから手動で Sync。手順は docs/argocd-self-managed.md）
+  # Argo CD 自身なので自動同期にしない（Diff を確認してから手動で Sync。手順は docs/operations/argocd.md）
   # finalizer も付けない（Application を消しても Argo CD 本体は残す）
   syncPolicy:
     syncOptions:
