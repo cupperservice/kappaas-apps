@@ -14,7 +14,7 @@ argo-cd:
       createSecret: false
   # argocd-server のサーバー証明書を cert-manager（クラスタの CA k8s-ca）で発行する（Secret argocd-server-tls）
   # argocd-server は argocd-server-tls があれば自動でそれを使う。無いと自己署名（O=Argo CD）になり、ブラウザで警告が出る
-  # ホスト名（domain）は環境ごとに prod/values.yaml・dev/values.yaml。Mac で k8s-ca を信頼する手順は docs/argocd-self-managed.md
+  # ホスト名（domain）は環境ごとに prod/values.yaml・dev/values.yaml。Mac で k8s-ca を信頼する手順は docs/setup/06-gitops.md の 7
   server:
     certificate:
       enabled: true

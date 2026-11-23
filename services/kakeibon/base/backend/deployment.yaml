@@ -15,7 +15,7 @@ spec:
     spec:
       imagePullSecrets:
         - name: kakeibon-ghcr-secret
-      # AWS の資格情報は Pod 内のサイドカー（aws_signing_helper serve、127.0.0.1:9911）から取る（docs/iam-roles-anywhere.md 段階 2）
+      # AWS の資格情報は Pod 内のサイドカー（aws_signing_helper serve、127.0.0.1:9911）から取る（docs/operations/aws-iam.md）
       # サイドカーの定義は charts/external-secrets/values.yaml の external-secrets のものと同じ
       initContainers:
         # aws_signing_helper を取得する

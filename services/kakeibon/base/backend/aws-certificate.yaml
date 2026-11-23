@@ -1,6 +1,6 @@
 # kakeibon-backend のサイドカー（aws_signing_helper）が IAM Roles Anywhere で使うクライアント証明書
 # CN は aws/rolesanywhere.yaml の KakeibonBackendRole の信頼ポリシー（x509Subject/CN）と合わせる
-# 発行元は各クラスタの k8s-ca（その環境のトラストアンカー）。docs/iam-roles-anywhere.md 段階 2
+# 発行元は各クラスタの k8s-ca（その環境のトラストアンカー）。docs/operations/aws-iam.md
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
