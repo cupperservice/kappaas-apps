@@ -1,22 +1,24 @@
 # IAM Roles Anywhere のロール分割とサイドカー化（external-secrets / kakeibon-backend）
 
+> **記録**（2026-11 の作業）。現在の構築・運用の手順は [docs/README.md](../README.md)。リンクは整理後の場所に直したが、文中のファイル名や状態は当時のもの。
+
 ## 環境分割後の実施方針（2026-11-16 追記）
 
 この文書は本番 / 開発に分ける前（2026-11-14）に書いた。今は次の方針で進める。下の設計・ポリシーの考え方はそのまま有効。
 
 | 項目 | 方針 |
 |---|---|
-| IAM の作り方 | CloudFormation（[aws/rolesanywhere.yaml](../aws/rolesanywhere.yaml)）で環境ごとにスタックを作る（`kappaas-dev-rolesanywhere` / `kappaas-prod-rolesanywhere`）。本番も新しいトラストアンカー・プロファイルを作る（下の「AWS 側の手順」の CLI は使わない） |
+| IAM の作り方 | CloudFormation（[aws/rolesanywhere.yaml](../../aws/rolesanywhere.yaml)）で環境ごとにスタックを作る（`kappaas-dev-rolesanywhere` / `kappaas-prod-rolesanywhere`）。本番も新しいトラストアンカー・プロファイルを作る（下の「AWS 側の手順」の CLI は使わない） |
 | ロール名 | external-secrets: 本番 `KappaasExternalSecretsRole`、開発 `KappaasDevExternalSecretsRole`（kakeibon-backend 用は段階 2 でテンプレートに追加） |
 | サイドカーの ARN | 環境ごとに違うので `charts/external-secrets/{prod,dev}/values.yaml` の `aws.*` に書き、ConfigMap `external-secrets-aws` 経由でサイドカーに渡す（サイドカーの定義は共通の `values.yaml` に 1 つ） |
-| 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（サイドカー・Certificate は `services/kakeibon/base/backend`、ARN は `overlays/<env>/patches/backend/aws-config-patch.yaml`。開発は 2026-11-22、本番は prod-cluster.md の段階 C で反映）。マニフェストは kakeibon-apps から `services/kakeibon` に移した（[kakeibon.md](kakeibon.md)）。下の文中の kakeibon-apps の `components/backend/...` は `services/kakeibon/base/backend/...` と読み替える |
+| 進め方 | **段階 1**: external-secrets（このリポジトリ。実装済み）。**段階 2**: kakeibon-backend（サイドカー・Certificate は `services/kakeibon/base/backend`、ARN は `overlays/<env>/patches/backend/aws-config-patch.yaml`。開発は 2026-11-22、本番は prod-cluster.md の段階 C で反映）。マニフェストは kakeibon-apps から `services/kakeibon` に移した（[kakeibon.md](../operations/kakeibon.md)）。下の文中の kakeibon-apps の `components/backend/...` は `services/kakeibon/base/backend/...` と読み替える |
 | 共用の aws-credential-helper | **廃止**（2026-11-23。Application・chart・Dependabot の設定を削除。prod-cluster.md の段階 C-3）。開発は段階 1 で、本番は kakeibon-backend をサイドカーに切り替えた後に外した。残りは KppaasRole と旧トラストアンカー・プロファイルの削除（ステップ 5） |
 | 開発の kakeibon-backend | サイドカーで `KakeibonBackendDevRole` を使う（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、SES は共用。docs/kakeibon-dev-aws.md） |
-| 本番テーブル | 本番は 2026-11-19 に `kakeibon-dev` から `kakeibon-prod` に移した（[kakeibon-dev-aws.md](kakeibon-dev-aws.md) の手順 1）。下の文中の本番の `kakeibon-dev` は `kakeibon-prod` と読み替える（aws/rolesanywhere.yaml の KakeibonBackendRole は kakeibon-prod を指す） |
+| 本番テーブル | 本番は 2026-11-19 に `kakeibon-dev` から `kakeibon-prod` に移した（[kakeibon-dev-aws.md](2026-11-kakeibon-dev-aws.md) の手順 1）。下の文中の本番の `kakeibon-dev` は `kakeibon-prod` と読み替える（aws/rolesanywhere.yaml の KakeibonBackendRole は kakeibon-prod を指す） |
 
 ### 段階 1 の手順（external-secrets）
 
-1. **[AWS]** 開発スタックを更新（Outputs の ExternalSecretsRoleArn が `KappaasDevExternalSecretsRole`）。手順は [dev-cluster.md](dev-cluster.md) の 7
+1. **[AWS]** 開発スタックを更新（Outputs の ExternalSecretsRoleArn が `KappaasDevExternalSecretsRole`）。手順は [dev-cluster.md](../setup/05-dev-cluster.md) の 7
 2. dev ブランチに push → 開発クラスタで下の「2. external-secrets にサイドカーを追加」の確認（`--context dev`）
 3. **[AWS]** 本番スタックを作成（`Environment=prod`、本番の CA）→ Outputs の ARN を `charts/external-secrets/prod/values.yaml` に書く
    ```bash

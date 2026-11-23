@@ -1,5 +1,7 @@
 # containerd を全ノード Docker 版 containerd.io 2.4.2 に統一
 
+> **記録**（2026-10 の作業）。現在の構築・運用の手順は [docs/README.md](../README.md)。リンクは整理後の場所に直したが、文中のファイル名や状態は当時のもの。
+
 ## 現状（2026-10-25）
 
 | ノード | OS | パッケージ | 入手元 | 作業 |
@@ -167,7 +169,7 @@ sudo apt-mark hold containerd.io
 ```
 - [x] sirius
 
-sirius の 26.04 化（リポジトリの差し替えと containerd.io の入れ直しを含む）は [sirius-os-upgrade.md](sirius-os-upgrade.md) を参照。
+sirius の 26.04 化（リポジトリの差し替えと containerd.io の入れ直しを含む）は sirius-os-upgrade.md（このリポジトリには無い） を参照。
 
 ---
 

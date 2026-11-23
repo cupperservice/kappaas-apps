@@ -1,5 +1,5 @@
 # 開発の kakeibon（https://kakeibon-dev.local）のサーバー証明書。Contour が TLS を終端する（patches/client/httpproxy-patch.yaml）
-# クラスタの CA（k8s-ca）で発行するので、Mac で開発の k8s-ca を信頼していれば警告は出ない（docs/argocd-self-managed.md「サーバー証明書」）
+# クラスタの CA（k8s-ca）で発行するので、Mac で開発の k8s-ca を信頼していれば警告は出ない（docs/setup/06-gitops.md の 7）
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

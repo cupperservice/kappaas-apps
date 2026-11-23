@@ -104,7 +104,7 @@ external-secrets:
     createClusterPushSecret: false
     createPushSecret: false
   # AWS の資格情報は Pod 内のサイドカー（aws_signing_helper serve、127.0.0.1:9911）から取る
-  # 設計と経緯は docs/iam-roles-anywhere.md
+  # 仕組みは docs/operations/aws-iam.md、経緯は docs/history/2026-11-iam-roles-anywhere.md
   extraEnv:
     - name: AWS_EC2_METADATA_SERVICE_ENDPOINT
       value: "http://127.0.0.1:9911"

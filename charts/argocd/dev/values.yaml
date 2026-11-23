@@ -1,5 +1,5 @@
 # 開発クラスタ（altair）用（values.yaml に重ねる）
-# GitHub の OAuth App はコールバック URL が 1 つなので、dev 用に別の OAuth App を作る（docs/dev-cluster.md）
+# GitHub の OAuth App はコールバック URL が 1 つなので、dev 用に別の OAuth App を作る（docs/setup/03-external.md）
 argo-cd:
   configs:
     cm:
