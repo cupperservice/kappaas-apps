@@ -1,11 +1,13 @@
 # 開発の kakeibon 用 AWS リソースの作成と、本番テーブルの kakeibon-dev → kakeibon-prod への移行
 
+> **記録**（2026-11 の作業）。現在の構築・運用の手順は [docs/README.md](../README.md)。リンクは整理後の場所に直したが、文中のファイル名や状態は当時のもの。
+
 開発クラスタ（altair）で kakeibon を動かす前に、開発用の AWS リソースを用意する。
 本番が `kakeibon-dev` という名前のテーブルを使っているので、本番を `kakeibon-prod` に移し、`kakeibon-dev` はデータを残したまま開発用にする。
 
 - 実行場所の表記: **[Mac]** = aws / kubectl を使う端末。aws は IAM・CloudFormation・DynamoDB を操作できる権限のプロファイルで実行する
 - **手順 1 は本番に影響する（最初に行う）**。作業中は kakeibon を操作しない。手順 2・3 は本番に影響しない
-- **進み具合（2026-11-22）**: 手順 1〜3 は完了。開発の kakeibon は services/kakeibon/overlays/dev で動いている（[kakeibon.md](kakeibon.md)）。残りは「手順 4: 次の作業」
+- **進み具合（2026-11-22）**: 手順 1〜3 は完了。開発の kakeibon は services/kakeibon/overlays/dev で動いている（[kakeibon.md](../operations/kakeibon.md)）。残りは「手順 4: 次の作業」
 
 ---
 
@@ -305,7 +307,7 @@ Mappings:
 
 **(3) Resources**: `Profile:` の前に KakeibonBackendRole を追加し、Profile の RoleArns に加える
 
-権限は [iam-roles-anywhere.md](iam-roles-anywhere.md) の「KakeibonBackendRole の権限ポリシー」と同じ。ただし S3 は使っていない `kakeibo-user-bucket` を外し、バケットへの操作とオブジェクトへの操作を分けた。
+権限は [iam-roles-anywhere.md](2026-11-iam-roles-anywhere.md) の「KakeibonBackendRole の権限ポリシー」と同じ。ただし S3 は使っていない `kakeibo-user-bucket` を外し、バケットへの操作とオブジェクトへの操作を分けた。
 
 ```yaml
   # kakeibon-backend のサイドカー（aws_signing_helper）が引き受けるロール
@@ -448,7 +450,7 @@ aws secretsmanager create-secret --region ap-northeast-1 \
 
 ### 3-3. 開発の rolesanywhere スタックを更新
 
-2-2 の PR をマージしてから。開発の CA 証明書（`~/k8s-backup/dev-ca.crt`）は [dev-cluster.md](dev-cluster.md) の手順 7 で取り出したもの。
+2-2 の PR をマージしてから。開発の CA 証明書（`~/k8s-backup/dev-ca.crt`）は [dev-cluster.md](../setup/05-dev-cluster.md) の手順 7 で取り出したもの。
 
 ```bash
 # [Mac] kappaas-apps のルートで（dev ブランチ）
@@ -491,6 +493,6 @@ KppaasRole のポリシーは `policy-before.json` を put-role-policy すれば
 
 - [x] 開発の kakeibon（2026-11-22 完了）
   - マニフェストは kakeibon-apps から `services/kakeibon` に移した（#9）。開発用の値（テーブル `kakeibon-dev`、バケット `kakeibo-data-bucket-dev`、JWT `kakeibon-dev/jwt-secret`、ホスト名 `kakeibon-dev.local`）は `overlays/dev` で切り替える
-  - 開発の kakeibon-backend のサイドカー化（[iam-roles-anywhere.md](iam-roles-anywhere.md) の段階 2、ロール `KakeibonBackendDevRole`）も実施（#12）。backend・client とも Ready、http://kakeibon-dev.local で開ける
+  - 開発の kakeibon-backend のサイドカー化（[iam-roles-anywhere.md](2026-11-iam-roles-anywhere.md) の段階 2、ロール `KakeibonBackendDevRole`）も実施（#12）。backend・client とも Ready、http://kakeibon-dev.local で開ける
 - [ ] 本番の rolesanywhere スタック（段階 1 の本番分）を作り、external-secrets と kakeibon-backend のサイドカーを本番にも入れる（KakeibonBackendRole は kakeibon-prod を指す）
 - 手順 1 の文中の「kakeibon-apps の main の `components/backend/configmap.yaml`」は、本番の release 切り替え後は `services/kakeibon/overlays/prod/patches/backend/configmap-patch.yaml`

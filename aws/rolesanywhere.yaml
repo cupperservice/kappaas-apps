@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 # クラスタ用の IAM Roles Anywhere（トラストアンカー・ロール・プロファイル）。Environment で dev / prod を選ぶ。
-# スタックは環境ごとに分ける（kappaas-dev-rolesanywhere / kappaas-prod-rolesanywhere）。手順は docs/dev-cluster.md の 7。
-# ロールは利用者ごとに分ける（docs/iam-roles-anywhere.md）。external-secrets コントローラー用と kakeibon-backend 用。
+# スタックは環境ごとに分ける（kappaas-dev-rolesanywhere / kappaas-prod-rolesanywhere）。手順は docs/setup/06-gitops.md の 4、docs/operations/aws-iam.md。
+# ロールは利用者ごとに分ける（docs/operations/aws-iam.md）。external-secrets コントローラー用と kakeibon-backend 用。
 # Description は CloudFormation で日本語が「?」に化けるので英語で書く
 Description: IAM Roles Anywhere for a kappaas cluster - trust anchor, role and profile
 
@@ -118,7 +118,7 @@ Resources:
                   - !Ref SecretArnPatterns
 
   # kakeibon-backend のサイドカー（aws_signing_helper）が引き受けるロール
-  # 権限は docs/iam-roles-anywhere.md の「KakeibonBackendRole の権限ポリシー」（S3 は使っていない user バケットを外した）
+  # 権限は docs/history/2026-11-iam-roles-anywhere.md の「KakeibonBackendRole の権限ポリシー」（S3 は使っていない user バケットを外した）
   KakeibonBackendRole:
     Type: AWS::IAM::Role
     Properties:
@@ -142,7 +142,7 @@ Resources:
               - sts:SetSourceIdentity
             Condition:
               # この環境のトラストアンカーで検証された、CN=kakeibon-backend の証明書だけ
-              # （CN は kakeibon-backend の Certificate の commonName と合わせる。iam-roles-anywhere.md の段階 2）
+              # （CN は kakeibon-backend の Certificate の commonName と合わせる。docs/history/2026-11-iam-roles-anywhere.md の段階 2）
               ArnEquals:
                 aws:SourceArn: !GetAtt TrustAnchor.TrustAnchorArn
               StringEquals:
@@ -210,6 +210,6 @@ Outputs:
     Value: !GetAtt Profile.ProfileArn
   ExternalSecretsRoleArn:
     Value: !GetAtt ExternalSecretsRole.Arn
-  # kakeibon-backend のサイドカーに渡す（iam-roles-anywhere.md の段階 2）
+  # kakeibon-backend のサイドカーに渡す（docs/history/2026-11-iam-roles-anywhere.md の段階 2）
   KakeibonBackendRoleArn:
     Value: !GetAtt KakeibonBackendRole.Arn

@@ -1,6 +1,8 @@
 # コントロールプレーン HA 化手順（CP 3台 + Worker 1台 + kube-vip）
 
-> **2026-11-15 以降の運用**: 本番は sirius / capella / spica の 3 台固定（[prod-cluster.md](prod-cluster.md)）。altair は別の開発クラスタ（[dev-cluster.md](dev-cluster.md)）。
+> **記録**（2026-10 の作業）。現在の構築・運用の手順は [docs/README.md](../README.md)。リンクは整理後の場所に直したが、文中のファイル名や状態は当時のもの。
+
+> **2026-11-15 以降の運用**: 本番は sirius / capella / spica の 3 台固定（[prod-cluster.md](../setup/04-prod-cluster.md)）。altair は別の開発クラスタ（[dev-cluster.md](../setup/05-dev-cluster.md)）。
 > 下の目標構成（capella = worker、altair = CP）は HA 化時点のもの。
 
 ## 目標構成

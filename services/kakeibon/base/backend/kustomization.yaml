@@ -6,6 +6,6 @@ resources:
   - deployment.yaml
   - service.yaml
   - serviceaccount.yaml
-  # AWS の認証（Pod 内のサイドカー）用。docs/iam-roles-anywhere.md 段階 2
+  # AWS の認証（Pod 内のサイドカー）用。docs/operations/aws-iam.md
   - aws-certificate.yaml
   - aws-config.yaml

@@ -1,4 +1,4 @@
-# 開発の S3 バケット・DynamoDB テーブル（docs/kakeibon-dev-aws.md）
+# 開発の S3 バケット・DynamoDB テーブル（docs/operations/kakeibon.md、作成の記録は docs/history/2026-11-kakeibon-dev-aws.md）
 # S3_USER_BUCKET_NAME は使っていないので設定しない
 apiVersion: v1
 kind: ConfigMap
