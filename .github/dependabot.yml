@@ -12,6 +12,7 @@ updates:
       - /charts/cloudflare-tunnel
       - /charts/csi-driver-smb
       - /charts/external-secrets
+      - /charts/kube-prometheus-stack
       - /charts/metrics-server
       - /charts/openebs-localpv
     schedule:

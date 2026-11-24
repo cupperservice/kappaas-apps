@@ -1,0 +1,94 @@
+# prod / dev 共通の値。環境ごとの値は prod/values.yaml・dev/values.yaml
+# 運用は docs/operations/monitoring.md
+
+# このチャートの templates/ が使う値（Grafana の公開と秘密情報）
+grafanaExternal:
+  # Contour の HTTPProxy のホスト名・Certificate の dnsNames（環境ごと）
+  host: ""
+  # Secrets Manager のシークレット名（環境ごと）。中身は JSON の github-client-secret・admin-password
+  secretKey: ""
+
+kube-prometheus-stack:
+  # アラートは今回は使わない（入れるときに別途）
+  alertmanager:
+    enabled: false
+
+  # kubeadm の既定では etcd・scheduler・controller-manager・kube-proxy のメトリクスは 127.0.0.1 でしか待ち受けておらず取れない
+  # 常に Down のターゲットを作らないよう無効にする（有効化はノード側の設定変更が必要）
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  kubeProxy:
+    enabled: false
+
+  prometheus:
+    prometheusSpec:
+      # このチャート以外（他の chart）が作る ServiceMonitor・PodMonitor・PrometheusRule も拾う
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      probeSelectorNilUsesHelmValues: false
+      scrapeConfigSelectorNilUsesHelmValues: false
+      # 保持期間・容量（retention・retentionSize・storage）は環境ごと
+      # ノードのローカルディスク（charts/openebs-localpv）。PV はノードに固定される
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: openebs-hostpath
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 5Gi
+      resources:
+        requests:
+          cpu: 200m
+          memory: 1Gi
+        limits:
+          memory: 2Gi
+
+  grafana:
+    # UI で作ったダッシュボードなどを残す（SQLite）。2 つの Pod から同時に開かないよう Recreate
+    persistence:
+      enabled: true
+      storageClassName: openebs-hostpath
+      size: 2Gi
+    deploymentStrategy:
+      type: Recreate
+    # ローカルの admin（緊急用）。Secret grafana-secrets は templates/external-secret.yaml が作る
+    admin:
+      existingSecret: grafana-secrets
+      userKey: admin-user
+      passwordKey: admin-password
+    # GitHub の OAuth App の client secret を環境変数で渡す
+    envValueFrom:
+      GF_AUTH_GITHUB_CLIENT_SECRET:
+        secretKeyRef:
+          name: grafana-secrets
+          key: github-client-secret
+    # helm test 用の Pod は作らない
+    testFramework:
+      enabled: false
+    grafana.ini:
+      # 利用統計の送信・更新確認をしない
+      analytics:
+        reporting_enabled: false
+        check_for_updates: false
+        check_for_plugin_updates: false
+      # server.root_url・auth.github.client_id は環境ごと
+      auth.github:
+        enabled: true
+        allow_sign_up: true
+        scopes: user:email
+        # GitHub アカウント cupperservice だけ Admin。それ以外は role が空になり、role_attribute_strict でログインを拒否する
+        role_attribute_path: "[login=='cupperservice'][0] && 'Admin' || ''"
+        role_attribute_strict: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi

@@ -1,0 +1,23 @@
+# 開発クラスタ（altair）用（values.yaml に重ねる）
+grafanaExternal:
+  host: grafana-dev.local
+  secretKey: kappaas-apps/monitoring-dev/grafana
+
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      retention: 7d
+      retentionSize: 4GB
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            resources:
+              requests:
+                storage: 5Gi
+  grafana:
+    grafana.ini:
+      server:
+        root_url: https://grafana-dev.local
+      # GitHub の OAuth App は callback URL が 1 つなので環境ごとに別（client secret は Secrets Manager）
+      auth.github:
+        client_id: Ov23liYSX7gDfRUSKJBd

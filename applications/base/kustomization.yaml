@@ -11,3 +11,4 @@ resources:
   - metrics-server.yaml
   - csi-driver-smb.yaml
   - openebs-localpv.yaml
+  - kube-prometheus-stack.yaml
