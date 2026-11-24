@@ -15,4 +15,6 @@ patches:
   - path: patches/cloudflare-tunnel-patch.yaml
   - path: patches/csi-driver-smb-patch.yaml
   - path: patches/external-secrets-patch.yaml
+  - path: patches/kube-prometheus-stack-patch.yaml
   - path: patches/metrics-server-patch.yaml
+  - path: patches/openebs-localpv-patch.yaml

@@ -26,6 +26,7 @@
 | MetalLB の IP | `192.168.3.120` | `192.168.3.121` |
 | Argo CD | https://argocd.local | https://argocd-dev.local |
 | 同期するブランチ | `release` | `dev` |
+| Grafana | https://grafana.local | https://grafana-dev.local |
 | kakeibon | http://kakeibon.local、外部公開 https://kakeibon.kappa-as.com（Cloudflare Tunnel） | https://kakeibon-dev.local（LAN 内のみ） |
 | AWS | IAM Roles Anywhere（本番の CA） | IAM Roles Anywhere（開発の CA） |
 
@@ -61,7 +62,7 @@
 | MetalLB | 0.15.3（Helm） |
 | Contour | chart 0.5.0（app 1.33.4、リリース名 `my-release`） |
 | Argo CD | argo-cd chart 9.5.14（`charts/argocd`） |
-| そのほかの chart | `charts/*/Chart.yaml`（cert-manager・external-secrets・cloudflare-tunnel・csi-driver-smb・metrics-server） |
+| そのほかの chart | `charts/*/Chart.yaml`（cert-manager・external-secrets・cloudflare-tunnel・csi-driver-smb・metrics-server・openebs-localpv・kube-prometheus-stack） |
 
 Cilium・MetalLB・Contour は Argo CD の管理外（クラスタ構築時に helm で入れる）。それ以外は Argo CD が `charts/` から入れる。
 

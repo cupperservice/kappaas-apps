@@ -1,0 +1,16 @@
+# prod / dev 共通の値。環境ごとの値は prod/values.yaml・dev/values.yaml
+# ノードのローカルディスク（/var/openebs/local）に PV を作る StorageClass openebs-hostpath を提供する（Prometheus・Grafana のデータ用）
+# PV は作られたノードに固定される。容量の上限は強制されないので、使う側（Prometheus の retentionSize など）で抑える
+localpv-provisioner:
+  hostpathClass:
+    name: openebs-hostpath
+    enabled: true
+    # 既定の StorageClass にはしない（使う側で storageClassName を明示する）
+    isDefaultClass: false
+    # PVC を消してもノード上のデータは消さない（不要になったら手で消す）
+    reclaimPolicy: Retain
+  localpv:
+    basePath: /var/openebs/local
+  # 利用状況を OpenEBS に送らない
+  analytics:
+    enabled: false
