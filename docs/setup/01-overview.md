@@ -61,7 +61,7 @@
 | MetalLB | 0.15.3（Helm） |
 | Contour | chart 0.5.0（app 1.33.4、リリース名 `my-release`） |
 | Argo CD | argo-cd chart 9.5.14（`charts/argocd`） |
-| そのほかの chart | `charts/*/Chart.yaml`（cert-manager・external-secrets・cloudflare-tunnel・csi-driver-smb・metrics-server） |
+| そのほかの chart | `charts/*/Chart.yaml`（cert-manager・external-secrets・cloudflare-tunnel・csi-driver-smb・metrics-server・openebs-localpv） |
 
 Cilium・MetalLB・Contour は Argo CD の管理外（クラスタ構築時に helm で入れる）。それ以外は Argo CD が `charts/` から入れる。
 
