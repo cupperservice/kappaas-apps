@@ -82,10 +82,14 @@ kube-prometheus-stack:
       auth.github:
         enabled: true
         allow_sign_up: true
-        scopes: user:email
+        # read:org が無いと Grafana がチーム一覧（/user/teams）を取れず、ログインが InternalError で失敗する
+        scopes: user:email,read:org
         # GitHub アカウント cupperservice だけ Admin。それ以外は role が空になり、role_attribute_strict でログインを拒否する
         role_attribute_path: "[login=='cupperservice'][0] && 'Admin' || ''"
         role_attribute_strict: true
+    # 初回起動時は DB の migration に数分かかり、既定（約 160 秒）だと liveness で再起動される。約 6 分待つ
+    livenessProbe:
+      failureThreshold: 30
     resources:
       requests:
         cpu: 50m
