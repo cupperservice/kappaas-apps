@@ -22,7 +22,7 @@ services/kakeibon/
 ```
 
 - `base/external-secrets.yaml` は `.gitignore` の `secrets.yaml` に掛からない名前にしている
-- Application は `argocd-config/applications/base/kakeibon-apps.yaml`（`app-kakeibon`）。path と targetRevision は `argocd-config/applications/overlays/<env>/patches/kakeibon-apps-patch.yaml`
+- Application は `argocd-config/applications/base/app-kakeibon.yaml`（`app-kakeibon`）。path と targetRevision は `argocd-config/applications/overlays/<env>/patches/app-kakeibon-patch.yaml`
 
 | 項目 | 本番 | 開発 |
 |---|---|---|
