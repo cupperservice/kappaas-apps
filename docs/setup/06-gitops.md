@@ -58,6 +58,7 @@ root-app が `applications/overlays/dev` を同期し、次のものが入る。
 | argocd-applications | `app-kakeibon`（`services/kakeibon/overlays/<env>`） |
 | argocd | Argo CD 自身（**手動 Sync**。下の 6） |
 | metrics-server・csi-driver-smb | |
+| openebs-localpv | StorageClass `openebs-hostpath`（ノードのローカルディスク `/var/openebs/local` に PV を作る。PV はそのノードに固定。Prometheus・Grafana 用） |
 | cloudflare-tunnel | 本番のみ |
 
 - このリポジトリは public なので、認証情報が無くても同期できる

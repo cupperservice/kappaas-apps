@@ -10,3 +10,4 @@ resources:
   - cloudflare-tunnel.yaml
   - metrics-server.yaml
   - csi-driver-smb.yaml
+  - openebs-localpv.yaml

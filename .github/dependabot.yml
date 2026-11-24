@@ -13,6 +13,7 @@ updates:
       - /charts/csi-driver-smb
       - /charts/external-secrets
       - /charts/metrics-server
+      - /charts/openebs-localpv
     schedule:
       interval: weekly
       day: monday
