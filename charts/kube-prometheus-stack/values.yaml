@@ -78,6 +78,9 @@ kube-prometheus-stack:
         reporting_enabled: false
         check_for_updates: false
         check_for_plugin_updates: false
+      # ID・パスワードのログインフォームを出さない（GitHub ログインだけ）。緊急用の admin は API（Basic 認証）でのみ使える
+      auth:
+        disable_login_form: true
       # server.root_url・auth.github.client_id は環境ごと
       auth.github:
         enabled: true
