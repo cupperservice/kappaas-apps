@@ -1,0 +1,13 @@
+# dev ブランチを同期し、chart の共通 values.yaml に dev/values.yaml を重ねる
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+spec:
+  source:
+    targetRevision: dev
+    helm:
+      valueFiles:
+        - values.yaml
+        - dev/values.yaml

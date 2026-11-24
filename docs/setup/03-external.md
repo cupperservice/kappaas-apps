@@ -41,6 +41,19 @@ stringData:
 
 - Argo CD にログインできるユーザー・権限は `charts/argocd/values.yaml` の `rbac`（`policy.csv`）
 
+### OAuth App（Grafana の GitHub ログイン）
+
+Argo CD とは別に、本番用と開発用を作る。
+
+| | 本番 | 開発 |
+|---|---|---|
+| Homepage URL | `https://grafana.local` | `https://grafana-dev.local` |
+| Authorization callback URL | `https://grafana.local/login/github` | `https://grafana-dev.local/login/github` |
+| Client ID を書く場所 | `charts/kube-prometheus-stack/prod/values.yaml` の `client_id` | `charts/kube-prometheus-stack/dev/values.yaml` の `client_id` |
+| Client secret を入れる場所 | Secrets Manager `kappaas-apps/monitoring/grafana`（下の表） | Secrets Manager `kappaas-apps/monitoring-dev/grafana` |
+
+- ログインできるのは GitHub アカウント `cupperservice` だけ（`charts/kube-prometheus-stack/values.yaml` の `role_attribute_path`）
+
 ### PAT（Personal Access Token）
 
 | 用途 | 権限 | Secrets Manager の名前 |
@@ -100,6 +113,8 @@ external-secrets（ESO）がクラスタに取り込む。値は画面に出さ�
 | `kappaas-apps/cloudflare/credentials` | トンネルの credentials JSON | `charts/cloudflare-tunnel`（本番のみ） |
 | `kakeibon/jwt-secret` | JWT の署名鍵（文字列） | `services/kakeibon/overlays/prod`（本番） |
 | `kakeibon-dev/jwt-secret` | JWT の署名鍵（文字列） | `services/kakeibon/overlays/dev`（開発） |
+| `kappaas-apps/monitoring/grafana` | JSON `{"github-client-secret":"<OAuth App の Client secret>","admin-password":"<ランダム>"}` | `charts/kube-prometheus-stack`（本番） |
+| `kappaas-apps/monitoring-dev/grafana` | 同上（開発の OAuth App・別のパスワード） | `charts/kube-prometheus-stack`（開発） |
 | `kappaas-apps/cloudflare/token` | トンネルのトークン | **どこからも参照されていない**（以前の cloudflared の起動方法の名残と思われる） |
 
 ```bash
@@ -113,6 +128,12 @@ read -s PAT
 aws secretsmanager create-secret --region ap-northeast-1 --name kappaas-apps/ghcr/github-personal-access-token \
   --secret-string "{\"auths\":{\"ghcr.io\":{\"auth\":\"$(printf '%s' "cupperservice:$PAT" | base64)\"}}}"
 unset PAT
+
+# 例: Grafana（Client secret を read -s で読み、admin のパスワードはランダムに作る）
+read -s CS
+aws secretsmanager create-secret --region ap-northeast-1 --name kappaas-apps/monitoring-dev/grafana \
+  --secret-string "{\"github-client-secret\":\"$CS\",\"admin-password\":\"$(openssl rand -base64 24)\"}"
+unset CS
 
 # 例: Cloudflare の credentials
 aws secretsmanager create-secret --region ap-northeast-1 --name kappaas-apps/cloudflare/credentials \

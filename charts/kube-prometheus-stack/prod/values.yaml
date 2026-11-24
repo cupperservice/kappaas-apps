@@ -1,0 +1,23 @@
+# 本番クラスタ用（values.yaml に重ねる）
+grafanaExternal:
+  host: grafana.local
+  secretKey: kappaas-apps/monitoring/grafana
+
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      retentionSize: 8GB
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            resources:
+              requests:
+                storage: 10Gi
+  grafana:
+    grafana.ini:
+      server:
+        root_url: https://grafana.local
+      # GitHub の OAuth App は callback URL が 1 つなので環境ごとに別（client secret は Secrets Manager）
+      auth.github:
+        client_id: Ov23liYlLyBEc7r03if6

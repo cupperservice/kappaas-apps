@@ -1,0 +1,39 @@
+# Grafana を https://<grafanaExternal.host> で公開する。TLS は Contour が終端し、証明書はクラスタの CA（k8s-ca）で発行する
+# Mac の /etc/hosts に MetalLB の IP で登録する（docs/setup/06-gitops.md の 1）
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: grafana-tls
+  namespace: {{ .Release.Namespace }}
+spec:
+  commonName: {{ required "grafanaExternal.host" .Values.grafanaExternal.host }}
+  dnsNames:
+    - {{ .Values.grafanaExternal.host }}
+  secretName: grafana-tls
+  duration: 2160h
+  renewBefore: 360h
+  privateKey:
+    algorithm: RSA
+    size: 2048
+  usages:
+    - server auth
+    - digital signature
+    - key encipherment
+  issuerRef:
+    name: k8s-ca
+    kind: ClusterIssuer
+---
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: grafana
+  namespace: {{ .Release.Namespace }}
+spec:
+  virtualhost:
+    fqdn: {{ .Values.grafanaExternal.host }}
+    tls:
+      secretName: grafana-tls
+  routes:
+    - services:
+        - name: {{ .Release.Name }}-grafana
+          port: 80

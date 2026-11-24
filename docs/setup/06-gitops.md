@@ -18,8 +18,8 @@
 ## 1. Mac の /etc/hosts
 
 ```
-192.168.3.120 argocd.local kakeibon.local
-192.168.3.121 argocd-dev.local kakeibon-dev.local
+192.168.3.120 argocd.local kakeibon.local grafana.local
+192.168.3.121 argocd-dev.local kakeibon-dev.local grafana-dev.local
 ```
 
 ## 2. Argo CD を helm で入れる
@@ -59,10 +59,11 @@ root-app が `applications/overlays/dev` を同期し、次のものが入る。
 | argocd | Argo CD 自身（**手動 Sync**。下の 6） |
 | metrics-server・csi-driver-smb | |
 | openebs-localpv | StorageClass `openebs-hostpath`（ノードのローカルディスク `/var/openebs/local` に PV を作る。PV はそのノードに固定。Prometheus・Grafana 用） |
+| kube-prometheus-stack | Prometheus・Grafana（namespace `monitoring`。[operations/monitoring.md](../operations/monitoring.md)）。Grafana の秘密情報は Secrets Manager（[03-external.md](03-external.md)） |
 | cloudflare-tunnel | 本番のみ |
 
 - このリポジトリは public なので、認証情報が無くても同期できる
-- この時点では AWS の認証ができないので、ExternalSecret（リポジトリの PAT・GHCR の PAT・JWT・Cloudflare）が作れず、kakeibon は起動しない。次の 4・5 で直る
+- この時点では AWS の認証ができないので、ExternalSecret（リポジトリの PAT・GHCR の PAT・JWT・Cloudflare・Grafana）が作れず、kakeibon は起動しない。次の 4・5 で直る
 
 ## 4. AWS: IAM Roles Anywhere（rolesanywhere スタック）
 
