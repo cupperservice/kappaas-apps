@@ -1,5 +1,5 @@
 # 業務アプリ kakeibon（マニフェストは services/kakeibon。以前は kakeibon-apps リポジトリの components）
-# path・targetRevision は overlays/<env>/patches/kakeibon-apps-patch.yaml で環境ごとに決める
+# path・targetRevision は overlays/<env>/patches/app-kakeibon-patch.yaml で環境ごとに決める
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
