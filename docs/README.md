@@ -21,6 +21,7 @@
 | [operations/argocd.md](operations/argocd.md) | Argo CD の更新・戻し方・サーバー証明書・クラスタの CA |
 | [operations/kakeibon.md](operations/kakeibon.md) | 業務アプリ kakeibon の構成・イメージの更新 |
 | [operations/aws-iam.md](operations/aws-iam.md) | IAM Roles Anywhere の仕組み・シークレットの追加・スタックの更新・**残作業（KppaasRole の削除）** |
+| [operations/monitoring.md](operations/monitoring.md) | Prometheus・Grafana の構成・ログイン・保持期間・データの置き場所（ノード固定）・ディスク逼迫 |
 | [operations/nodes.md](operations/nodes.md) | ノードの再起動・altair の停止と起動・kubelet の設定・CP の故障・SMC による強制減速 |
 | [operations/troubleshooting.md](operations/troubleshooting.md) | ブラウザから開けない・401・NotReady・Pod が Ready にならない・ExternalSecret |
 
