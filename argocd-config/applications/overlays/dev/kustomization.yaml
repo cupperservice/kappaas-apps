@@ -7,4 +7,4 @@ resources:
 
 # patches/<base のファイル名>-patch.yaml
 patches:
-  - path: patches/kakeibon-apps-patch.yaml
+  - path: patches/app-kakeibon-patch.yaml
