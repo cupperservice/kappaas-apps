@@ -30,11 +30,18 @@
 
 - GitHub でログインする。ログインできるのは GitHub アカウント `cupperservice` だけで、Admin になる（`values.yaml` の `role_attribute_path`。それ以外は `role_attribute_strict` で拒否）
 - OAuth App は Argo CD とは別に環境ごとにある（[setup/03-external.md](../setup/03-external.md)）
+- ID・パスワードのログインフォームは出さない（`values.yaml` の `auth.disable_login_form`）
 - 緊急用にローカルの `admin` がある。パスワードは Secrets Manager の `admin-password`
+  - フォームが無いので画面からは入れない。API（Basic 認証）では使える
+  - GitHub ログインができず画面で操作したいときは、`disable_login_form` を一時的に `false` にして同期する
 
 ```bash
 # admin のパスワードを確認する
 kubectl --context dev -n monitoring get secret grafana-secrets -o jsonpath='{.data.admin-password}' | base64 -d; echo
+
+# admin で API を使う（例: GitHub ログインのユーザー一覧）
+kubectl --context dev -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80
+curl -s -u "admin:<パスワード>" http://localhost:3000/api/users
 ```
 
 ## Prometheus を直接見る
