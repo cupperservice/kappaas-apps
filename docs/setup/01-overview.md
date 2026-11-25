@@ -47,6 +47,7 @@
 | （NAS） | 192.168.3.10 | SMB 共有 `k8s-disk-1`（guest）。`charts/csi-driver-smb` の PV |
 
 - 本体はすべて Mac mini（Macmini7,1）。NIC は `enp3s0f0`（kube-vip の `--interface` に使う）
+- ディスク: 本番 3 台は SSD（sirius・spica は NVMe、capella は SATA）。altair は OS が HDD で、PV・etcd・containerd は 128GB の SSD に置く（[operations/nodes.md](../operations/nodes.md)「altair のディスク」）
 - OS は Ubuntu 26.04（Server）。IP は各ノードで固定する（[02-node.md](02-node.md)）。ルーターの DHCP の範囲から上の IP（.120〜.127、.250）を外しておく
 - ノードの SMC（本体の管理チップ）が誤動作すると CPU が強制減速される（[operations/nodes.md](../operations/nodes.md)「SMC による CPU の強制減速」）
 
