@@ -1,5 +1,7 @@
 # Grafana を https://<grafanaExternal.host> で公開する。TLS は Contour が終端し、証明書はクラスタの CA（k8s-ca）で発行する
 # Mac の /etc/hosts に MetalLB の IP で登録する（docs/setup/06-gitops.md の 1）
+# Grafana を無効にした環境（kube-prometheus-stack.grafana.enabled: false）では作らない
+{{- if ne (index .Values "kube-prometheus-stack" "grafana" "enabled") false }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -37,3 +39,4 @@ spec:
     - services:
         - name: {{ .Release.Name }}-grafana
           port: 80
+{{- end }}
