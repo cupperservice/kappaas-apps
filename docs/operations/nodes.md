@@ -45,6 +45,33 @@ ssh altair sudo poweroff
 - 1 台なので drain は不要（drain しても移す先が無い）
 - （任意）kubelet にシャットダウン時の待ち時間を設定すると、poweroff のときに Pod を順に止めるようになる。`kube-system/kubelet-config` に `shutdownGracePeriod: 60s`・`shutdownGracePeriodCriticalPods: 20s` を足し、下の「kubelet の設定を変える」で反映する
 
+## altair のディスク
+
+altair の OS（`/`）は 2.5 インチの HDD（`sda`、`APPLE_HDD_HTS541`）。HDD だと I/O が詰まって etcd が遅れ、kube-apiserver が再起動を繰り返す（2026-11-25。[history/2026-11-monitoring.md](../history/2026-11-monitoring.md) の問題 4）。
+そのため、I/O の多い 3 つを 128GB の SSD（`sdb`、`APPLE_SSD_SM0128`）に置き、bind マウントで元のパスに見せている。containerd・kubeadm・OpenEBS の設定（パス）は変えていない。
+
+| パス | SSD 上の場所 | 中身 |
+|---|---|---|
+| `/var/openebs` | `/mnt/ssd/openebs` | OpenEBS の PV（Prometheus・Grafana のデータ） |
+| `/var/lib/etcd` | `/mnt/ssd/etcd` | etcd のデータ |
+| `/var/lib/containerd` | `/mnt/ssd/containerd` | イメージ・コンテナの層 |
+
+```bash
+# [altair] /etc/fstab の末尾（SSD は LABEL=altair-ssd の ext4）
+LABEL=altair-ssd /mnt/ssd ext4 defaults,noatime 0 2
+/mnt/ssd/openebs     /var/openebs        none bind 0 0
+/mnt/ssd/etcd        /var/lib/etcd       none bind 0 0
+/mnt/ssd/containerd  /var/lib/containerd none bind 0 0
+
+# 確認（3 つとも SOURCE が /dev/sdb1[...]）
+for d in /var/openebs /var/lib/etcd /var/lib/containerd; do findmnt -M $d -n -o TARGET,SOURCE; done
+```
+
+- 移したときの手順: SSD をフォーマット（`mkfs.ext4 -L altair-ssd`）→ `systemctl disable kubelet containerd` して再起動 → `rsync -aHAX --numeric-ids` で 3 つをコピー → 元を `*.hdd-bak` に退避して bind マウント → `systemctl enable kubelet containerd` して再起動
+- 戻すとき: fstab の bind の 3 行を消し、`*.hdd-bak` が残っていれば元の名前に戻して再起動
+- altair を作り直すときは、SSD に OS ごと入れてもよい（`/` の使用量は 30GB 弱）
+- 確認: iowait は `100*avg(rate(node_cpu_seconds_total{mode="iowait"}[5m]))`（HDD だけのときは 60〜70%、SSD に移して約 3%）
+
 ## kubelet の設定を変える
 
 kubelet の設定はクラスタの `kube-system/kubelet-config`（ConfigMap）に置き、各ノードに反映する。ConfigMap にあれば、後から join するノードにも入る。
