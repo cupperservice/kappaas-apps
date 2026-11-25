@@ -21,7 +21,8 @@ Mac の kubeconfig で、開発のユーザー名が本番と同じ `kubernetes-
 
 ## ノードが NotReady
 
-- まず CPU の周波数を見る（`ssh <node> grep MHz /proc/cpuinfo`）。数百 MHz なら SMC による強制減速（[nodes.md](nodes.md)「SMC による CPU の強制減速」）
+- まず Mac から ping する（`ping <ノードの IP>`）。**応答が無ければ** LAN ケーブル・電源・OS のハングを疑い、本体を見に行く（2026-11-25 の sirius は LAN ケーブルが抜けていた）。etcd が 2 台で動いているので、他のノードの再起動・drain はしない
+- ping が通るなら CPU の周波数を見る（`ssh <node> grep MHz /proc/cpuinfo`）。数百 MHz なら SMC による強制減速（[nodes.md](nodes.md)「SMC による CPU の強制減速」）
 - 構築直後（Cilium を入れる前）は NotReady で正常
 - kubelet のログ: `ssh <node> sudo journalctl -u kubelet --since -30min --no-pager | tail -50`
 
