@@ -15,10 +15,6 @@ kube-prometheus-stack:
               requests:
                 storage: 5Gi
   grafana:
-    # 2026-11-25: altair の OS ディスクは HDD で、再起動後に Grafana が 35MB/s 前後を読み続けて
-    # ディスクが飽和し（iowait 60〜70%）、etcd が遅れて kube-apiserver が再起動を繰り返した。
-    # 原因を調べるまで開発では止める。PVC も消える（PV は Retain なので altair の /var/openebs/local にデータは残る。戻すと新しい PV になる）
-    enabled: false
     grafana.ini:
       server:
         root_url: https://grafana-dev.local
