@@ -63,17 +63,46 @@ Prometheus と Grafana のデータは、OpenEBS LocalPV Hostpath（StorageClass
 - 容量の上限は強制されない。Prometheus は `retentionSize` で抑えている
 
 ```bash
-# どのノードにあるか
-kubectl --context prod -n monitoring get pvc
-kubectl --context prod get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]
+# どのノードにあるか（zsh では [0] がファイル名のパターンになるので、-o の引数を引用符で囲む）
+kubectl --context prod get pv -o 'custom-columns=PV:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]'
+# 1 つだけ見るなら
+kubectl --context prod describe pv <PV 名> | grep -A3 "Node Affinity"
 # ノードのディスクの空き
 ssh sirius df -h /var
+```
+
+### PV のあるノードが止まったとき
+
+新しい Pod は他のノードに移れず Pending になる（イベントは `didn't match PersistentVolume's node affinity`）。古い Pod は Terminating のまま残る。
+
+- **ノードが戻れば何もしなくてよい。** Pending の Pod がそのノードで起動し、Terminating の Pod は消える（2026-11-25 の sirius の例: [history/2026-11-monitoring.md](../history/2026-11-monitoring.md)）
+- Prometheus が別のノードにあれば、止まったノードの直前までのメトリクスを見られる（負荷・メモリ・CPU 温度など。調べ方は下の「ノードの障害を調べる」）
+- ノードがすぐ戻らず Grafana を先に戻したいときは、Grafana の PVC を消して作り直す（まだ実施したことのない手順。ログインしたユーザーなど Grafana のデータは消える。標準のダッシュボードは chart から作り直される）
+
+```bash
+kubectl --context prod -n monitoring delete pvc kube-prometheus-stack-grafana --wait=false   # Pod が使っている間は Terminating のまま
+kubectl --context prod -n monitoring delete pod -l app.kubernetes.io/name=grafana --force
+# Argo CD が PVC を作り直し、動いているノードに新しい PV ができる。古い PV（Retain）はノードが戻ってから消す
 ```
 
 ### ディスクが逼迫したとき
 
 1. `prod/values.yaml`（または `dev/values.yaml`）の `retention`・`retentionSize` を下げる
 2. それでも足りなければ PVC を消して作り直す（過去のメトリクスは消える）
+
+## ノードの障害を調べる
+
+Grafana の Explore、または Prometheus（上の port-forward）でクエリする。`instance` はノードの IP（例 `192.168.3.124:9100`）。
+
+| 見るもの | クエリ |
+|---|---|
+| 負荷 | `node_load1{instance=~"192.168.3.124.*"}` |
+| 空きメモリ（%） | `100 * node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes` |
+| CPU 温度 | `node_hwmon_temp_celsius{chip="platform_coretemp_0"}` |
+| CPU 周波数（MHz） | `avg by (instance) (node_cpu_scaling_frequency_hertz) / 1e6`（数百 MHz なら SMC による減速。[nodes.md](nodes.md)） |
+| 最後に取れた時刻 | `timestamp(up{job="node-exporter"})` |
+
+- `chip="platform_applesmc_768"` の `temp20`（98）・`temp11`（93）は全ノードで同じ値のまま変わらず、実際の温度ではない。CPU 温度は `platform_coretemp_0` を見る
 
 ## ダッシュボード
 
