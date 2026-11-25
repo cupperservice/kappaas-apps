@@ -36,3 +36,4 @@
 | [history/2026-11-iam-roles-anywhere.md](history/2026-11-iam-roles-anywhere.md) | IAM Roles Anywhere のロール分割とサイドカー化の設計・移行 |
 | [history/2026-11-kakeibon-dev-aws.md](history/2026-11-kakeibon-dev-aws.md) | 開発の kakeibon 用 AWS リソースの作成、本番テーブルの kakeibon-prod への移行 |
 | [history/2026-11-prod-migration.md](history/2026-11-prod-migration.md) | 本番の release ブランチ・base / overlays への移行（段階 A〜C）、Argo CD の自己管理化、入れ替え運用の記録 |
+| [history/2026-11-monitoring.md](history/2026-11-monitoring.md) | Prometheus・Grafana の導入（保存先などの決定・ログインの不具合・sirius の LAN ケーブル抜けで Grafana が止まった件） |
