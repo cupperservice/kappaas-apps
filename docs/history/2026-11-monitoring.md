@@ -25,6 +25,9 @@ SMC による CPU の強制減速（2026-11-17 capella）のような障害を�
 | 2026-11-24 | #39 | Grafana の GitHub ログインの修正（下の「問題 1」）と livenessProbe の猶予（「問題 2」） |
 | 2026-11-24 | #41 | Grafana のログインフォームを出さない（`auth.disable_login_form`） |
 | 2026-11-24 | #40・#42 | dev → main → release。本番に反映 |
+| 2026-11-25 | #44 | この記録と、PV のノード固定・NotReady の手順 |
+| 2026-11-25 | #47 | 開発の Grafana を止める（下の「問題 4」） |
+| 2026-11-25 | （この PR） | altair の PV・etcd・containerd を SSD に移したので、開発の Grafana を戻す |
 
 本番に入れた直後の状態: Prometheus は capella、Grafana は sirius に PV ができた。ターゲット 22 個すべて UP。ノードのメモリ使用率 26〜33%。
 
@@ -58,6 +61,18 @@ Grafana は GitHub ログイン時にチーム一覧（`/user/teams`）を取得
 - 気づいたのは Grafana が開けなかったから。アラートが無いので、ノードの NotReady や etcd メンバーの停止を通知できるようにしたい（残りの作業）
 - 調べている途中で、`operations/monitoring.md` の PV のノードを調べるコマンドが zsh で動かないことがわかった（`[0]` がファイル名のパターンになる）。引用符で囲むように直した
 - NotReady のときは、まず ping で SMC の減速（ping は通る）とケーブル・電源・ハング（ping が通らない）を切り分けるよう `operations/troubleshooting.md` に足した
+
+### 問題 4: 開発の Grafana が altair の HDD を飽和させ、kube-apiserver が落ちた（2026-11-25）
+
+- 16:02 JST に altair が正常にシャットダウンされ（`systemd-poweroff`）、17:09 JST に起動した
+- 起動後、OS ディスク（**HDD** `APPLE_HDD_HTS541`）の使用率がほぼ 100%、iowait 60〜70%、読み込み約 40MB/s が続いた
+- etcd が遅れ、kube-apiserver が `poststarthook/rbac/bootstrap-roles failed` で再起動を繰り返した（SMC の減速と同じ症状。CPU の周波数・温度は正常で、SMC ではなかった）
+- altair で `/proc/<pid>/io` を 10 秒測ると、読み込みは grafana 約 34MB/s、`gpx_grafana-loki` 約 2.5MB/s でほぼすべて。本番の Grafana（SSD）は同じ時期に再起動しても読み込みはほぼ 0 だった
+- #47 で開発の Grafana を止めると、iowait が下がり kube-apiserver も安定した
+- altair には使っていない 128GB の SSD（古い macOS が入っていた）があったので、OS は HDD のまま PV・etcd・containerd を SSD に移した（bind マウント。[operations/nodes.md](../operations/nodes.md)「altair のディスク」）。コピーは containerd 12G・etcd 394M・PV 399M。移した後、iowait は約 3%、HDD の使用率は 1%、Prometheus の過去のデータも残った
+- そのうえで開発の Grafana を戻した
+
+Grafana が HDD のときに何を読み続けていたかは確かめていない（HDD が遅く、Grafana の処理がタイムアウトしてやり直すたびに読み直していた可能性がある）。
 
 ## 残りの作業
 
