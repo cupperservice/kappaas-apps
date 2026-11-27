@@ -70,9 +70,9 @@ Alertmanager が Slack（Incoming Webhook）に送る。設定は `values.yaml` 
 kubectl --context dev -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093
 # http://localhost:9093
 
-# テスト送信（別のターミナルで。5 分後に resolved も届く）
+# テスト送信（別のターミナルで）。endsAt を付けないので resolve_timeout（5 分）後に resolved も届く
 curl -s -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d \
-  "[{\"labels\":{\"alertname\":\"TestAlert\",\"severity\":\"warning\",\"cluster\":\"dev\"},\"annotations\":{\"summary\":\"テスト送信\"},\"endsAt\":\"$(date -u -v+5M +%Y-%m-%dT%H:%M:%SZ)\"}]"
+  '[{"labels":{"alertname":"TestAlert","severity":"warning","cluster":"dev"},"annotations":{"summary":"テスト送信"}}]'
 ```
 
 ## データの置き場所
