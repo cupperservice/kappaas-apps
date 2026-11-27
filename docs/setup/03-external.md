@@ -135,6 +135,12 @@ aws secretsmanager create-secret --region ap-northeast-1 --name kappaas-apps/mon
   --secret-string "{\"github-client-secret\":\"$CS\",\"admin-password\":\"$(openssl rand -base64 24)\"}"
 unset CS
 
+# 例: Alertmanager の通知先（Slack の Incoming Webhook の URL を read -s で読む。本番は kappaas-apps/monitoring/alertmanager）
+read -s URL
+aws secretsmanager create-secret --region ap-northeast-1 --name kappaas-apps/monitoring-dev/alertmanager \
+  --secret-string "{\"slack-webhook-url\":\"$URL\"}"
+unset URL
+
 # 例: Cloudflare の credentials
 aws secretsmanager create-secret --region ap-northeast-1 --name kappaas-apps/cloudflare/credentials \
   --secret-string file://$HOME/.cloudflared/<トンネル ID>.json
