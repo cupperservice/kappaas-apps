@@ -156,9 +156,9 @@ sudo turbostat --debug --num_iterations 1 --interval 1 2>&1 | grep CORE_PERF_LIM
 ```
 
 - 正常なノードと比べると分かりやすい（周波数・SMC の温度・ファンの回転数）
-- Prometheus にもアラート `NodeSmcTemperatureHigh`（SMC 温度 90℃ 超が 5 分）・`NodeSmcFanHigh`（ファン 4,000 rpm 超が 5 分）がある（`charts/kube-prometheus-stack/values.yaml`）。通知は無いので、Prometheus の Alerts か Grafana の Alerting で見る
-  - 誤動作中はそのノードが重すぎて Prometheus が値を取れず、欠損になることが多い（altair の 2 回とも、直前まで正常値のまま途切れた）。SMC のアラートが出なくても、ノードの NotReady やターゲットが落ちたこと（標準のアラート `KubeNodeNotReady`・`TargetDown`）も合わせて見る
-  - 開発の Prometheus は altair 上で動くので、altair で起きると Prometheus 自身も止まる
+- Prometheus にもアラート `NodeSmcTemperatureHigh`（SMC 温度 90℃ 超が 5 分）・`NodeSmcFanHigh`（ファン 4,000 rpm 超が 5 分）がある（`charts/kube-prometheus-stack/values.yaml`）。Slack に通知される（[monitoring.md](monitoring.md)「アラートの通知」）
+  - 誤動作中はそのノードが重すぎて Prometheus が値を取れず、欠損になることが多い（altair の 2 回とも、直前まで正常値のまま途切れた）。SMC のアラートが来なくても、標準のアラート `KubeNodeNotReady`・`KubeNodeUnreachable`・`TargetDown` で気づける（本番は Prometheus・Alertmanager が別のノードにあれば届く。同じノードに載っていた場合は来ない）
+  - 開発の Prometheus・Alertmanager は altair 上で動くので、altair で起きると通知は来ない
 - CPU 自身のセンサー（TC0P・TC0C）が低いのに SMC の値だけ高い場合は、センサー・SMC の異常
 
 ### 対処

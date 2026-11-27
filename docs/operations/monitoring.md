@@ -7,11 +7,11 @@
 | Grafana | https://grafana.local | https://grafana-dev.local |
 | Prometheus の保持 | 15 日・最大 8GB（PVC 10Gi） | 7 日・最大 4GB（PVC 5Gi） |
 | Grafana のデータ | PVC 2Gi | PVC 2Gi |
-| 秘密情報（Secrets Manager） | `kappaas-apps/monitoring/grafana` | `kappaas-apps/monitoring-dev/grafana` |
+| 秘密情報（Secrets Manager） | `kappaas-apps/monitoring/grafana`・`kappaas-apps/monitoring/alertmanager` | `kappaas-apps/monitoring-dev/grafana`・`kappaas-apps/monitoring-dev/alertmanager` |
 
 - chart: `charts/kube-prometheus-stack`（Application `kube-prometheus-stack`、namespace `monitoring`）
 - 環境ごとの値は `charts/kube-prometheus-stack/{prod,dev}/values.yaml`
-- Alertmanager は入れていない（アラートの通知は未設定）。アラートのルールは SMC の誤動作の検知だけ入れている（`values.yaml` の `additionalPrometheusRulesMap`、[nodes.md](nodes.md) の「SMC による CPU の強制減速」）。発火したかは Prometheus の Alerts で見る
+- アラートは Alertmanager から Slack に通知する（下の「アラートの通知」）
 
 ## 構成
 
@@ -21,7 +21,8 @@
 | node-exporter（DaemonSet） | 各ノードの CPU・メモリ・ディスク・ネットワーク |
 | kube-state-metrics | Deployment・Pod などの状態 |
 | Grafana | データソースは Prometheus。標準のダッシュボード（Kubernetes / Compute Resources、Node Exporter など）入り |
-| `templates/external-secret.yaml` | SecretStore と ExternalSecret → Secret `grafana-secrets`（admin のパスワード・OAuth の Client secret） |
+| Alertmanager（Operator 管理） | Prometheus のアラートを Slack に送る。PV は使わない |
+| `templates/external-secret.yaml` | SecretStore と ExternalSecret → Secret `grafana-secrets`（admin のパスワード・OAuth の Client secret）、`alertmanager-slack`（Slack の Webhook URL） |
 | `templates/grafana-httpproxy.yaml` | Certificate `grafana-tls`（ClusterIssuer `k8s-ca`）と Contour の HTTPProxy（TLS は Contour で終端） |
 
 取っていないもの: etcd・kube-scheduler・kube-controller-manager・kube-proxy。kubeadm の既定ではメトリクスを 127.0.0.1 でしか待ち受けないため、values で無効にしている（有効にするにはノード側の設定変更が要る）。
@@ -51,6 +52,27 @@ Prometheus は外に公開していない。ターゲットやクエリを確認
 ```bash
 kubectl --context dev -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090
 # http://localhost:9090/targets
+```
+
+## アラートの通知
+
+Alertmanager が Slack（Incoming Webhook）に送る。設定は `values.yaml` の `alertmanager.config`。
+
+- ルールは chart の標準のもの（`KubeNodeNotReady`・`TargetDown`・`KubePodCrashLooping` など）と、SMC の誤動作の検知（`additionalPrometheusRulesMap`、[nodes.md](nodes.md) の「SMC による CPU の強制減速」）
+- 送らないもの: `Watchdog`（常に発火している生存確認）・`InfoInhibitor`・severity が `none`・`info` のもの
+- 同じアラート名・同じ instance をまとめて送る。発火中は 12 時間ごとに再送し、解消したら `[RESOLVED]` を送る
+- タイトルに `prod`・`dev` が付く（`prometheusSpec.externalLabels.cluster`）
+- Webhook URL は Secrets Manager の `slack-webhook-url`（登録は [setup/03-external.md](../setup/03-external.md)）。シークレットが無いと ExternalSecret が失敗し、Alertmanager の Pod が起動しない
+- **Prometheus・Alertmanager が載っているノード自身が止まると通知は来ない。** 開発は 1 台（altair）なので、altair が止まっても通知されない（クラスタ間の依存は作らない方針）
+
+```bash
+# Alertmanager の画面（発火中のアラート・一時的な抑止 silence）
+kubectl --context dev -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093
+# http://localhost:9093
+
+# テスト送信（別のターミナルで。5 分後に resolved も届く）
+curl -s -XPOST http://localhost:9093/api/v2/alerts -H 'Content-Type: application/json' -d \
+  "[{\"labels\":{\"alertname\":\"TestAlert\",\"severity\":\"warning\",\"cluster\":\"dev\"},\"annotations\":{\"summary\":\"テスト送信\"},\"endsAt\":\"$(date -u -v+5M +%Y-%m-%dT%H:%M:%SZ)\"}]"
 ```
 
 ## データの置き場所
