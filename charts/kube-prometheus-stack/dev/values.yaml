@@ -3,9 +3,15 @@ grafanaExternal:
   host: grafana-dev.local
   secretKey: kappaas-apps/monitoring-dev/grafana
 
+alertmanagerExternal:
+  secretKey: kappaas-apps/monitoring-dev/alertmanager
+
 kube-prometheus-stack:
   prometheus:
     prometheusSpec:
+      # アラートに付く。Slack の通知でどちらのクラスタか分かるようにする
+      externalLabels:
+        cluster: dev
       retention: 7d
       retentionSize: 4GB
       storageSpec:
