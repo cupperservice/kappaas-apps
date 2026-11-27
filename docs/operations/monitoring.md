@@ -11,7 +11,7 @@
 
 - chart: `charts/kube-prometheus-stack`（Application `kube-prometheus-stack`、namespace `monitoring`）
 - 環境ごとの値は `charts/kube-prometheus-stack/{prod,dev}/values.yaml`
-- Alertmanager は入れていない（アラートの通知は未設定）
+- Alertmanager は入れていない（アラートの通知は未設定）。アラートのルールは SMC の誤動作の検知だけ入れている（`values.yaml` の `additionalPrometheusRulesMap`、[nodes.md](nodes.md) の「SMC による CPU の強制減速」）。発火したかは Prometheus の Alerts で見る
 
 ## 構成
 

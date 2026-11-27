@@ -9,9 +9,41 @@ grafanaExternal:
   secretKey: ""
 
 kube-prometheus-stack:
-  # アラートは今回は使わない（入れるときに別途）
+  # アラートの通知はまだ使わない（入れるときに別途）。ルールだけ下の additionalPrometheusRulesMap にある
   alertmanager:
     enabled: false
+
+  # Mac の SMC の誤動作（センサーが 100℃ 前後を報告 → ファン最大・CPU を約 220 MHz に減速）を検知する
+  # 通知先（Alertmanager）は無いので、Prometheus の Alerts・Grafana の Alerting で見る。手順は docs/operations/nodes.md
+  # 誤動作中はノードが重すぎて値が取れず欠損し、発火しないことがある（標準の KubeNodeNotReady・TargetDown も合わせて見る）
+  additionalPrometheusRulesMap:
+    node-smc:
+      groups:
+        - name: node-smc
+          rules:
+            - alert: NodeSmcTemperatureHigh
+              # TC0F・TC0E・TCXC（CPU）・TPCD（チップセット）。正常時は 40〜50℃
+              expr: |
+                max by (instance, label) (
+                  node_hwmon_temp_celsius
+                  * on (chip, sensor, instance) group_left (label)
+                  node_hwmon_sensor_label{label=~"TC0F|TC0E|TCXC|TPCD"}
+                ) > 90
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "{{ $labels.instance }} の SMC 温度 {{ $labels.label }} が {{ $value }}℃"
+                description: SMC の誤動作で CPU が強制減速されている可能性。docs/operations/nodes.md の「SMC による CPU の強制減速」を参照
+            - alert: NodeSmcFanHigh
+              # 正常時は最低の約 1,800 rpm、最大は 4,800 rpm
+              expr: node_hwmon_fan_rpm > 4000
+              for: 5m
+              labels:
+                severity: warning
+              annotations:
+                summary: "{{ $labels.instance }} のファンが {{ $value }} rpm"
+                description: SMC の誤動作で CPU が強制減速されている可能性。docs/operations/nodes.md の「SMC による CPU の強制減速」を参照
 
   # kubeadm の既定では etcd・scheduler・controller-manager・kube-proxy のメトリクスは 127.0.0.1 でしか待ち受けておらず取れない
   # 常に Down のターゲットを作らないよう無効にする（有効化はノード側の設定変更が必要）

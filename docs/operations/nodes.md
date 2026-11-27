@@ -123,7 +123,7 @@ done
 
 修理に時間がかかる場合は、altair（開発クラスタ）を `kubeadm reset` して本番に入れることもできる（開発環境は作り直しになる）。
 
-## SMC による CPU の強制減速（2026-11-17 capella で発生）
+## SMC による CPU の強制減速（2026-11-17 capella、11-25・11-28 altair で発生）
 
 ### 症状
 
@@ -156,6 +156,9 @@ sudo turbostat --debug --num_iterations 1 --interval 1 2>&1 | grep CORE_PERF_LIM
 ```
 
 - 正常なノードと比べると分かりやすい（周波数・SMC の温度・ファンの回転数）
+- Prometheus にもアラート `NodeSmcTemperatureHigh`（SMC 温度 90℃ 超が 5 分）・`NodeSmcFanHigh`（ファン 4,000 rpm 超が 5 分）がある（`charts/kube-prometheus-stack/values.yaml`）。通知は無いので、Prometheus の Alerts か Grafana の Alerting で見る
+  - 誤動作中はそのノードが重すぎて Prometheus が値を取れず、欠損になることが多い（altair の 2 回とも、直前まで正常値のまま途切れた）。SMC のアラートが出なくても、ノードの NotReady やターゲットが落ちたこと（標準のアラート `KubeNodeNotReady`・`TargetDown`）も合わせて見る
+  - 開発の Prometheus は altair 上で動くので、altair で起きると Prometheus 自身も止まる
 - CPU 自身のセンサー（TC0P・TC0C）が低いのに SMC の値だけ高い場合は、センサー・SMC の異常
 
 ### 対処
@@ -173,9 +176,28 @@ sudo turbostat --debug --num_iterations 1 --interval 1 2>&1 | grep CORE_PERF_LIM
 センサー・SMC・冷却（チップセットのヒートシンクなど）のハードウェア故障を疑う。修理するまでそのノードを本番から外す。
 外している間の etcd は 2 台（耐障害性 0）になるので、必要なら altair を本番に入れる（上の「CP が故障したとき」）。
 
+別の本体（capella・altair）でも起きているので、1 台の故障だけでなく共通の原因も疑う。2026-11-28 時点の切り分け:
+
+| ノード | 機種 | ファームウェア | カーネル | 発生 |
+| ------ | ---- | -------------- | -------- | ---- |
+| sirius | Macmini7,1 | 244 | 7.0.0-42 | なし |
+| capella | Macmini7,1 | 483 | 7.0.0-43 | 11-17 |
+| spica | Macmini7,1 | 483 | 7.0.0-43 | なし |
+| altair | Macmini7,1 | 249 | 7.0.0-43 → -44 | 11-25・11-28 |
+
+- ファームウェアは起きた 2 台で版が違い、同じ版の spica では起きていない → 版では説明できない
+- 起きていない sirius だけカーネルが -42。新しいカーネル（-43 以降）の疑いが残る。**カーネルは下げずに修正版を待つ**方針。カーネルを更新したら上の表を直し、再発するか見る
+- altair の Apple Diagnostics（起動時に D キー）は ADP000（異常なし）。ただし起動時の点検なので、ときどき起きる誤動作は見逃しうる
+- 直前まで SMC の温度・ファンは正常値（最大 57℃・1,814 rpm）で、突然起きる。じわじわ熱くなった形跡はなく、ほこりなどで本当に熱がこもった線は薄い
+- 直前のログに apt・cron・applesmc・thermal・ACPI のメッセージは無い。最初に出るのは containerd・kubelet のタイムアウト
+- node-exporter（SMC を定期的に読む）の導入は 11-24 で、capella の発生より後。監視の導入はきっかけではない
+- 復旧はこれまで毎回、電源ケーブルを抜く SMC リセットで行った（再起動だけで直るかは試していない。直るなら自動で再起動する仕組みも作れる）
+
 | 日付 | ノード | 対処 | 備考 |
 | ---- | ------ | ---- | ---- |
 | 2026-11-17 | capella | 停止 → SMC リセット → 起動 | NotReady は 05:31〜20:42 UTC 頃。サービス停止なし |
+| 2026-11-25 | altair | 停止 → SMC リセット → 起動 | ファン 4,798 rpm、TC0F 100℃・TPCD 117℃（TC0P 32℃）、約 220 MHz、load 128。開発の API が応答しなくなった（本番に影響なし） |
+| 2026-11-28 | altair | 停止 → SMC リセット → 起動 | 11-25 から 3 日で再発（11-27 21:55 UTC 頃）。ファンの音で気づいた。開発の kube-apiserver が止まった |
 
 ## ノードが暴走したときの調査
 
